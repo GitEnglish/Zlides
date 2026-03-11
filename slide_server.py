@@ -191,20 +191,17 @@ Requirements:
 
 The HTML should be a fully self-contained slide ready to display in a browser."""
 
-    messages = []
+    # GLM Slide Agent only accepts role: user, no system messages
+    # Combine system prompt with user message if provided
+    user_text = request.message
     if request.system_prompt:
-        combined = request.system_prompt + "\n\n" + default_system
-        messages.append(
-            {"role": "system", "content": [{"type": "text", "text": combined}]}
-        )
+        user_text = f"{request.system_prompt}\n\n{user_text}"
     else:
-        messages.append(
-            {"role": "system", "content": [{"type": "text", "text": default_system}]}
-        )
+        user_text = f"{default_system}\n\n{user_text}"
 
-    messages.append(
-        {"role": "user", "content": [{"type": "text", "text": request.message}]}
-    )
+    messages = [
+        {"role": "user", "content": [{"type": "text", "text": user_text}]}
+    ]
 
     # Start fresh conversation for each slide request to avoid state issues
     # Only reuse conversation_id if explicitly continuing (in future we can add a 'continue' flag)
