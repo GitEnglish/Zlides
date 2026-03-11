@@ -279,7 +279,6 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
                         if line_data == "[DONE]":
                             continue
                         try:
-                            line_data = line[6:]  # Remove "data:" prefix
                             if not line_data or line_data.strip() == "[DONE]":
                                 continue
                             chunk = json.loads(line_data)
@@ -439,7 +438,8 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
                                                     print(
                                                         f"[Accumulate] Added {len(text)} chars from text item"
                                                     )
-                        except Exception:
+                        except Exception as e:
+                            print(f"[Debug] SSE parse error: {e}")
                             pass
 
                 # Done reading the stream.
