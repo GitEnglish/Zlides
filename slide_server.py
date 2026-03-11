@@ -297,7 +297,7 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
                                 if not isinstance(choice, dict):
                                     print(f"[Debug] choice is not a dict: {type(choice)}")
                                     continue
-                                messages = choice.get("messages", [])
+                                messages = choice.get("message", [])
 
                                 # Also try to get HTML from delta if present (newer API format)
                                 delta = choice.get("delta", {})
@@ -450,8 +450,12 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
                                 continue
                             choices = chunk.get("choices", [])
                             for choice in choices:
-                                msgs = choice.get("messages", [])
+                                if not isinstance(choice, dict):
+                                    continue
+                                msgs = choice.get("message", [])
                                 for msg in msgs:
+                                    if not isinstance(msg, dict):
+                                        continue
                                     content = msg.get("content", {})
                                     # Check for HTML in text content
                                     if (
@@ -532,7 +536,9 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
                                 continue
                             choices = chunk.get("choices", [])
                             for choice in choices:
-                                msgs = choice.get("messages", [])
+                                if not isinstance(choice, dict):
+                                    continue
+                                msgs = choice.get("message", [])
                                 for msg in msgs:
                                     content = msg.get("content", [])
                                     for item in content:
