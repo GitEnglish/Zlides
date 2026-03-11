@@ -293,9 +293,11 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
 
                             # Check for API errors
                             if chunk.get("status") == "failed":
-                                error_msg = chunk.get("error", {}).get(
-                                    "message", "Unknown API error"
-                                )
+                                error = chunk.get("error", {})
+                                if isinstance(error, dict):
+                                    error_msg = error.get("message", "Unknown API error")
+                                else:
+                                    error_msg = str(error) if error else "Unknown API error"
                                 print(f"[API Error] {error_msg}")
                                 yield f"data: {json.dumps({'type': 'error', 'text': f'API Error: {error_msg}'})}\n\n"
                                 return
