@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Minimalist API Reference Documentation</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "primary": "#135bec",
+                "background-light": "#f6f6f8",
+                "background-dark": "#101622",
+              },
+              fontFamily: {
+                "display": ["Inter", "sans-serif"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+      </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .code-block { font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<!-- Top Navigation Bar -->
+<header class="sticky top-0 z-50 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md px-8 py-3">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-2.5">
+<div class="size-7 bg-primary rounded-lg flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-sm">api</span>
+</div>
+<h2 class="text-slate-900 dark:text-white text-base font-bold tracking-tight">Nexus API</h2>
+</div>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-slate-600 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Guides</a>
+<a class="text-primary text-sm font-semibold" href="#">References</a>
+<a class="text-slate-600 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Changelog</a>
+<a class="text-slate-600 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Support</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+<span class="material-symbols-outlined text-lg">search</span>
+</div>
+<input class="block w-64 pl-10 pr-3 py-1.5 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-slate-500" placeholder="Search documentation..." type="text"/>
+</div>
+<button class="bg-primary hover:bg-primary/90 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all shadow-sm">
+                Sign In
+            </button>
+</div>
+</header>
+<div class="flex min-h-screen">
+<!-- Left Sidebar Navigation -->
+<aside class="w-72 border-r border-slate-200 dark:border-slate-800 overflow-y-auto h-[calc(100vh-60px)] sticky top-[60px] p-6 no-scrollbar bg-white dark:bg-background-dark">
+<div class="mb-8">
+<div class="flex items-center gap-2 mb-4 px-2">
+<span class="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Current Version</span>
+<span class="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold">v2.4.0</span>
+</div>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 rounded-lg group" href="#">
+<span class="material-symbols-outlined text-lg text-primary">home</span>
+<span>Introduction</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-lg opacity-70 group-hover:text-primary">lock</span>
+<span>Authentication</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-all group" href="#">
+<span class="material-symbols-outlined text-lg opacity-70 group-hover:text-primary">layers</span>
+<span>Core Reference</span>
+</a>
+</div>
+</div>
+<div class="mb-8">
+<h3 class="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Endpoints</h3>
+<div class="space-y-1">
+<a class="flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-all" href="#">
+<span>Users</span>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+</a>
+<a class="flex items-center justify-between px-3 py-2 text-sm font-medium text-primary bg-primary/5 rounded-lg border-l-2 border-primary" href="#">
+<span>Implementation</span>
+<span class="material-symbols-outlined text-xs">keyboard_arrow_down</span>
+</a>
+<div class="pl-6 space-y-1 mt-1">
+<a class="block px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-primary" href="#">Standard Setup</a>
+<a class="block px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-primary" href="#">Advanced Params</a>
+<a class="block px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-primary" href="#">Error Handling</a>
+</div>
+<a class="flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-all" href="#">
+<span>Transactions</span>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto">
+<div class="max-w-5xl mx-auto px-12 py-16">
+<!-- Breadcrumbs -->
+<nav class="flex items-center gap-2 text-xs font-medium text-slate-400 mb-8">
+<a class="hover:text-slate-600" href="#">References</a>
+<span class="material-symbols-outlined text-[10px]">chevron_right</span>
+<span class="text-slate-900 dark:text-white">Implementation</span>
+</nav>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-16">
+<!-- Text Content -->
+<div class="lg:col-span-7">
+<h1 class="text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-6">Standard Implementation</h1>
+<p class="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+                            Our standard implementation provides the most resilient foundation for modern applications. 
+                            It balances performance, security, and developer velocity using pre-configured defaults.
+                        </p>
+<section class="mb-12">
+<h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4">Recommended for Most Apps</h2>
+<p class="text-slate-600 dark:text-slate-400 mb-6">
+                                For 90% of use cases, we recommend using our SDK wrappers which handle automatic retries, 
+                                exponential backoff, and signature verification out of the box.
+                            </p>
+<div class="bg-primary/5 border border-primary/10 rounded-xl p-6 mb-8">
+<div class="flex items-start gap-4">
+<div class="bg-primary/20 text-primary rounded-full p-1">
+<span class="material-symbols-outlined text-lg">lightbulb</span>
+</div>
+<div>
+<h4 class="text-sm font-bold text-primary mb-1">Quick Start Tip</h4>
+<p class="text-sm text-slate-600 dark:text-slate-400 leading-normal">
+                                            Make sure to rotate your API keys every 90 days. You can automate this process using our CLI tools or the Management API.
+                                        </p>
+</div>
+</div>
+</div>
+<h3 class="text-lg font-bold text-slate-900 dark:text-white mb-3">Key Benefits</h3>
+<ul class="space-y-3">
+<li class="flex items-start gap-3 text-slate-600 dark:text-slate-400 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check_circle</span>
+<span>Built-in type safety with TypeScript definitions.</span>
+</li>
+<li class="flex items-start gap-3 text-slate-600 dark:text-slate-400 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check_circle</span>
+<span>Optimized payload compression using Brotli.</span>
+</li>
+<li class="flex items-start gap-3 text-slate-600 dark:text-slate-400 text-sm">
+<span class="material-symbols-outlined text-primary text-lg">check_circle</span>
+<span>Global edge caching for latency-sensitive requests.</span>
+</li>
+</ul>
+</section>
+</div>
+<!-- Code Snippet & Technical Details -->
+<div class="lg:col-span-5">
+<div class="sticky top-24">
+<div class="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-[#fbfbfc] dark:bg-slate-900 shadow-sm">
+<div class="flex items-center justify-between px-4 py-2 bg-slate-100/50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-slate-300"></span>
+<span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Request Example</span>
+</div>
+<button class="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700">
+<span class="material-symbols-outlined text-xs">content_copy</span>
+                                        COPY
+                                    </button>
+</div>
+<div class="p-6 overflow-x-auto no-scrollbar">
+<pre class="code-block text-xs leading-relaxed text-slate-700 dark:text-slate-300"><span class="text-purple-500">const</span> nexus = <span class="text-purple-500">require</span>(<span class="text-emerald-600">'@nexus/sdk'</span>);
+
+<span class="text-purple-500">const</span> client = <span class="text-primary">new</span> nexus.<span class="text-blue-600">Client</span>({
+  apiKey: <span class="text-emerald-600">'nx_live_51M...'</span>,
+  timeout: <span class="text-orange-500">5000</span>
+});
+
+<span class="text-slate-400">// Initialize standard flow</span>
+<span class="text-purple-500">async</span> <span class="text-purple-500">function</span> <span class="text-blue-600">init</span>() {
+  <span class="text-purple-500">try</span> {
+    <span class="text-purple-500">const</span> session = <span class="text-purple-500">await</span> client.sessions.<span class="text-blue-600">create</span>({
+      mode: <span class="text-emerald-600">'standard'</span>,
+      callback_url: <span class="text-emerald-600">'https://app.io'</span>
+    });
+    console.<span class="text-blue-600">log</span>(session.id);
+  } <span class="text-purple-500">catch</span> (err) {
+    console.<span class="text-blue-600">error</span>(err.message);
+  }
+}
+                                    </pre>
+</div>
+</div>
+<!-- Parameters Table -->
+<div class="mt-8">
+<h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 px-1">Parameters</h4>
+<div class="border-t border-slate-200 dark:border-slate-800">
+<div class="py-3 px-1 border-b border-slate-200 dark:border-slate-800 group">
+<div class="flex items-center justify-between mb-1">
+<span class="text-sm font-bold text-slate-900 dark:text-white">mode</span>
+<span class="text-[10px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded uppercase">required</span>
+</div>
+<p class="text-xs text-slate-500 leading-normal italic mb-1">string</p>
+<p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                                            The implementation pattern to use. Must be either <code class="text-primary font-mono text-[10px]">standard</code> or <code class="text-primary font-mono text-[10px]">express</code>.
+                                        </p>
+</div>
+<div class="py-3 px-1 border-b border-slate-200 dark:border-slate-800 group">
+<div class="flex items-center justify-between mb-1">
+<span class="text-sm font-bold text-slate-900 dark:text-white">callback_url</span>
+<span class="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded uppercase">optional</span>
+</div>
+<p class="text-xs text-slate-500 leading-normal italic mb-1">url</p>
+<p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                                            The secure URL to redirect users back to after successful verification.
+                                        </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer area -->
+<div class="mt-24 pt-12 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-slate-400 text-xs">
+<p>© 2024 Nexus Technologies. All rights reserved.</p>
+<div class="flex gap-6">
+<a class="hover:text-primary" href="#">Status</a>
+<a class="hover:text-primary" href="#">Privacy</a>
+<a class="hover:text-primary" href="#">Twitter</a>
+</div>
+</div>
+</div>
+</main>
+<!-- Right Anchor Sidebar (Optional/On hover or Scroll) -->
+<aside class="hidden xl:block w-56 p-12 overflow-y-auto h-screen sticky top-0">
+<h4 class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">On this page</h4>
+<nav class="space-y-3">
+<a class="block text-xs font-medium text-primary border-l-2 border-primary pl-3" href="#">Overview</a>
+<a class="block text-xs font-medium text-slate-500 hover:text-slate-900 pl-3 border-l-2 border-transparent transition-all" href="#">Quick Start Tip</a>
+<a class="block text-xs font-medium text-slate-500 hover:text-slate-900 pl-3 border-l-2 border-transparent transition-all" href="#">Key Benefits</a>
+<a class="block text-xs font-medium text-slate-500 hover:text-slate-900 pl-3 border-l-2 border-transparent transition-all" href="#">Request Example</a>
+<a class="block text-xs font-medium text-slate-500 hover:text-slate-900 pl-3 border-l-2 border-transparent transition-all" href="#">Parameters</a>
+</nav>
+</aside>
+</div>
+</body></html>
