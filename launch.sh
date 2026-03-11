@@ -20,16 +20,36 @@ if [ -z "$Z_AI_API_KEY" ]; then
     exit 1
 fi
 
-# Kill any existing server on port 8766
+# Kill any existing servers aggressively
 echo "🧹 Cleaning up old processes..."
+# Kill by port
 lsof -ti:8766 | xargs kill -9 2>/dev/null || true
-sleep 1
+lsof -ti:8765 | xargs kill -9 2>/dev/null || true
+# Kill by process name
+pkill -9 -f "slide_server.py" 2>/dev/null || true
+pkill -9 -f "http.server 8765" 2>/dev/null || true
+sleep 2
+
+# Verify ports are free
+if lsof -Pi :8766 -sTCP:LISTEN -t >/dev/null ; then
+    echo "❌ Port 8766 still in use!"
+    exit 1
+fi
 
 # Start HTTP server in background for frontend
 echo "📱 Starting frontend server..."
-pkill -f "http.server 8765" 2>/dev/null || true
 python3 -m http.server 8765 > /dev/null 2>&1 &
 sleep 1
+
+# Cleanup function for Ctrl+C
+cleanup() {
+    echo ""
+    echo "🛑 Shutting down..."
+    pkill -9 -f "slide_server.py" 2>/dev/null || true
+    pkill -9 -f "http.server 8765" 2>/dev/null || true
+    exit 0
+}
+trap cleanup INT TERM
 
 echo "🌐 Starting backend server..."
 echo "✅ Server running at http://localhost:8766"
