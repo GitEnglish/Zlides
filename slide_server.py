@@ -211,7 +211,7 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
     conversation_id = session_store.get("conversation_id")
 
     payload = {
-        "agent_id": "general_translation",
+        "agent_id": "slides_glm_agent",
         "stream": True,
         "messages": messages,
     }
@@ -688,7 +688,7 @@ async def upload_file(
 async def extract_text_from_image(file_id: str) -> str:
     """Use the agent to extract text from an uploaded image (OCR)."""
     payload = {
-        "agent_id": "general_translation",
+        "agent_id": "slides_glm_agent",
         "stream": False,
         "conversation_id": session_store.get("conversation_id"),
         "messages": [
@@ -741,7 +741,7 @@ async def get_history():
         return {"history": [], "conversation_id": None}
 
     payload = {
-        "agent_id": "general_translation",
+        "agent_id": "slides_glm_agent",
         "conversation_id": session_store["conversation_id"],
     }
 
@@ -798,7 +798,7 @@ async def sdk_regenerate(request: dict):
         custom_vars["style"] = style
 
     payload = {
-        "agent_id": "general_translation",
+        "agent_id": "slides_glm_agent",
         "stream": True,
         "conversation_id": session_store.get("conversation_id"),
         "messages": [
