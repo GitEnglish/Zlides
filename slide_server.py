@@ -13,6 +13,9 @@ from dotenv import load_dotenv
 # Load .env file
 load_dotenv()
 
+# Version info
+VERSION = "0.1.0"
+
 # Configuration
 Z_AI_API_KEY = os.getenv("Z_AI_API_KEY")
 ZAI_ENDPOINT = "https://api.z.ai/api/v1/agents"
@@ -24,12 +27,50 @@ SAVED_SLIDES_DIR = "saved_slides"
 SESSION_FILE = "session.json"
 os.makedirs(SAVED_SLIDES_DIR, exist_ok=True)
 
-app = FastAPI(title="Zlides API", version="0.1.0")
+app = FastAPI(title="Zlides API", version=VERSION)
+
+
+def get_git_version():
+    """Get current git commit hash."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
 
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "Zlides API", "version": "0.1.0"}
+    return {
+        "status": "ok",
+        "service": "Zlides API",
+        "version": VERSION,
+        "git_commit": get_git_version()
+    }
+
+
+@app.get("/version")
+async def version():
+    """Get API version and git commit info."""
+    return {
+        "version": VERSION,
+        "git_commit": get_git_version(),
+        "endpoints": {
+            "command": "/command",
+            "upload": "/upload",
+            "history": "/history",
+            "style": "/style",
+            "pointer": "/pointer"
+        }
+    }
 
 
 def generate_token(apikey: str):
