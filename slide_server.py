@@ -168,6 +168,7 @@ async def send_command(request: ChatRequest):
     headers = {
         "Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}",
         "Content-Type": "application/json",
+        "Accept-Language": "en-US,en",
     }
 
     custom_vars = {}
@@ -210,7 +211,7 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
     conversation_id = session_store.get("conversation_id")
 
     payload = {
-        "agent_id": "slides_glm_agent",
+        "agent_id": "general_translation",
         "stream": True,
         "messages": messages,
     }
@@ -653,7 +654,10 @@ async def upload_file(
             ZAI_FILES_ENDPOINT,
             files=files,
             data=data,
-            headers={"Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}"},
+            headers={
+                "Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}",
+                "Accept-Language": "en-US,en",
+            },
         )
 
     if response.status_code != 200:
@@ -684,7 +688,7 @@ async def upload_file(
 async def extract_text_from_image(file_id: str) -> str:
     """Use the agent to extract text from an uploaded image (OCR)."""
     payload = {
-        "agent_id": "slides_glm_agent",
+        "agent_id": "general_translation",
         "stream": False,
         "conversation_id": session_store.get("conversation_id"),
         "messages": [
@@ -701,7 +705,10 @@ async def extract_text_from_image(file_id: str) -> str:
         "file_ids": [file_id],
     }
 
-    headers = {"Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}"}
+    headers = {
+        "Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}",
+        "Accept-Language": "en-US,en",
+    }
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(ZAI_ENDPOINT, json=payload, headers=headers)
@@ -734,11 +741,14 @@ async def get_history():
         return {"history": [], "conversation_id": None}
 
     payload = {
-        "agent_id": "slides_glm_agent",
+        "agent_id": "general_translation",
         "conversation_id": session_store["conversation_id"],
     }
 
-    headers = {"Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}"}
+    headers = {
+        "Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}",
+        "Accept-Language": "en-US,en",
+    }
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
@@ -788,7 +798,7 @@ async def sdk_regenerate(request: dict):
         custom_vars["style"] = style
 
     payload = {
-        "agent_id": "slides_glm_agent",
+        "agent_id": "general_translation",
         "stream": True,
         "conversation_id": session_store.get("conversation_id"),
         "messages": [
@@ -801,7 +811,10 @@ async def sdk_regenerate(request: dict):
     if custom_vars:
         payload["custom_variables"] = custom_vars
 
-    headers = {"Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}"}
+    headers = {
+        "Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}",
+        "Accept-Language": "en-US,en",
+    }
     import json
 
     async with httpx.AsyncClient(timeout=120.0) as client:
