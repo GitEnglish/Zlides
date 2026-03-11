@@ -228,22 +228,10 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
         # Clear old conversation to start fresh
         session_store["conversation_id"] = None
 
-    # Add all slide options
-    if request.page_count > 1:
-        custom_vars["page_count"] = request.page_count
-    if request.slide_type == "poster":
-        custom_vars["output_format"] = "poster"
-    if request.layout:
-        custom_vars["layout"] = request.layout
-    if request.theme:
-        custom_vars["theme"] = request.theme
-    if request.language and request.language != "en":
-        custom_vars["language"] = request.language
-    if not request.web_search:
-        custom_vars["web_search"] = False
-
-    if custom_vars:
-        payload["custom_variables"] = custom_vars
+    # Note: slides_glm_agent doesn't accept custom_variables like page_count, theme, etc.
+    # Those options are handled via the system prompt and user message only
+    # Keeping custom_vars empty for the slide agent to avoid API errors
+    pass  # Skip custom_variables for slide agent - it doesn't support them
 
     # Add style reference image if available
     style_image_id = session_store.pop("pending_style_image", None)
