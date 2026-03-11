@@ -303,9 +303,12 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
                                 yield f"data: {json.dumps({'type': 'error', 'text': f'API Error: {error_msg}'})}\n\n"
                                 return
 
-                            if "choices" in chunk:
+                            if "choices" in chunk and isinstance(chunk["choices"], list) and len(chunk["choices"]) > 0:
                                 last_data = chunk
                                 choice = chunk["choices"][0]
+                                if not isinstance(choice, dict):
+                                    print(f"[Debug] choice is not a dict: {type(choice)}")
+                                    continue
                                 messages = choice.get("messages", [])
 
                                 # Also try to get HTML from delta if present (newer API format)
