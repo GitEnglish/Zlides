@@ -210,7 +210,7 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
     conversation_id = session_store.get("conversation_id")
 
     payload = {
-        "agent_id": "slides_glm_agent",
+        "agent_id": "glm5",
         "stream": True,
         "messages": messages,
     }
@@ -250,7 +250,7 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
         payload["file_ids"] = [style_image_id]
 
     # DEBUG: Print what we're sending
-    print(f"[API Request] Agent: {payload['agent_id']}")
+    print(f"[API Request] Agent: {payload['agent_id']} (glm5 agent mode)")
     print(f"[API Request] Message: {request.message[:50]}...")
     print(f"[API Request] Custom vars: {custom_vars}")
 
@@ -684,7 +684,7 @@ async def upload_file(
 async def extract_text_from_image(file_id: str) -> str:
     """Use the agent to extract text from an uploaded image (OCR)."""
     payload = {
-        "agent_id": "slides_glm_agent",
+        "agent_id": "glm5",
         "stream": False,
         "conversation_id": session_store.get("conversation_id"),
         "messages": [
@@ -734,7 +734,7 @@ async def get_history():
         return {"history": [], "conversation_id": None}
 
     payload = {
-        "agent_id": "slides_glm_agent",
+        "agent_id": "glm5",
         "conversation_id": session_store["conversation_id"],
     }
 
@@ -788,7 +788,7 @@ async def sdk_regenerate(request: dict):
         custom_vars["style"] = style
 
     payload = {
-        "agent_id": "slides_glm_agent",
+        "agent_id": "glm5",
         "stream": True,
         "conversation_id": session_store.get("conversation_id"),
         "messages": [
