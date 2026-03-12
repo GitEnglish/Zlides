@@ -351,22 +351,6 @@ wheels = [
 ]
 
 [[package]]
-name = "zai-sdk"
-version = "0.0.3.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cachetools" },
-    { name = "httpx" },
-    { name = "pydantic" },
-    { name = "pydantic-core" },
-    { name = "pyjwt" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c1/ef/eb110f8e7a7b81d4f188a0f2e420d09771b3347a65dc775e80e22db48051/zai_sdk-0.0.3.4.tar.gz", hash = "sha256:c116370bafe29481aebfc0deea454e9a009b21c88c17fb143fdcdf5f4857c303", size = 69962, upload-time = "2025-09-01T08:16:13.528Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/8c/1715574027840468859e114fe2c4dc660ae1606f6215595ead802062365f/zai_sdk-0.0.3.4-py3-none-any.whl", hash = "sha256:646f4d1efa81f6d941c09665eb4515cc8db853c66db35ce5416e002e39a61d1b", size = 110506, upload-time = "2025-09-01T08:16:12.335Z" },
-]
-
-[[package]]
 name = "zhipuai"
 version = "2.1.5.20250825"
 source = { registry = "https://pypi.org/simple" }
@@ -396,7 +380,6 @@ dependencies = [
     { name = "python-multipart" },
     { name = "sniffio" },
     { name = "uvicorn" },
-    { name = "zai-sdk" },
     { name = "zhipuai" },
 ]
 
@@ -411,6 +394,5 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.22" },
     { name = "sniffio", specifier = ">=1.3.1" },
     { name = "uvicorn", specifier = ">=0.41.0" },
-    { name = "zai-sdk", specifier = ">=0.0.3.4" },
     { name = "zhipuai", specifier = ">=2.1.5.20250825" },
 ]
