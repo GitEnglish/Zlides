@@ -151,7 +151,7 @@ def save_slide_to_file(html: str, prompt: str):
 class ChatRequest(BaseModel):
     message: str
     system_prompt: str = ""
-    page_count: int = 1
+    page_count: int | None = None
     slide_type: str = "slides"  # slides or poster
     layout: str = ""  # title-content, two-column, title-only, blank
     theme: str = ""  # minimal, corporate, creative, dark, colorful
@@ -189,7 +189,7 @@ Requirements:
 4. Make it visually professional with good typography, spacing, and colors
 5. Include actual content - not placeholder text
 
-The HTML should be a fully self-contained slide ready to display in a browser."""
+The HTML should be a fully self-contained presentation ready to display in a browser."""
 
     # GLM Slide Agent only accepts role: user, no system messages
     # Combine system prompt with user message if provided
@@ -294,7 +294,7 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
                                 if not isinstance(choice, dict):
                                     print(f"[Debug] choice is not a dict: {type(choice)}")
                                     continue
-                                messages = choice.get("message", [])
+                                messages = choice.get("messages", [])
 
                                 # Also try to get HTML from delta if present (newer API format)
                                 delta = choice.get("delta", {})
@@ -449,7 +449,7 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
                             for choice in choices:
                                 if not isinstance(choice, dict):
                                     continue
-                                msgs = choice.get("message", [])
+                                msgs = choice.get("messages", [])
                                 for msg in msgs:
                                     if not isinstance(msg, dict):
                                         continue
@@ -535,11 +535,11 @@ The HTML should be a fully self-contained slide ready to display in a browser.""
                             for choice in choices:
                                 if not isinstance(choice, dict):
                                     continue
-                                msgs = choice.get("message", [])
+                                msgs = choice.get("messages", [])
                                 for msg in msgs:
                                     content = msg.get("content", [])
                                     for item in content:
-                                        if item.get("type") == "text":
+                                        if isinstance(item, dict) and item.get("type") == "text":
                                             text = item.get("text", "")
                                             if text and len(text) > 200:
                                                 slide_html = wrap_in_slide_html(

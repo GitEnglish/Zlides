@@ -110,7 +110,7 @@
             <div class="opts-row">
                 <div>
                     <label>Pages</label>
-                    <input type="number" id="page-count" min="1" max="20" value="1">
+                    <input type="number" id="page-count" min="1" max="20" placeholder="Auto">
                 </div>
                 <div>
                     <label>Type</label>
@@ -225,7 +225,7 @@
                     body: JSON.stringify({ 
                         message: text,
                         system_prompt: systemPrompt,
-                        page_count: parseInt(pageCountBox.value) || 1,
+                        page_count: pageCountBox.value ? parseInt(pageCountBox.value) : null,
                         slide_type: slideTypeBox.value,
                         layout: slideLayoutBox.value,
                         theme: slideThemeBox.value
