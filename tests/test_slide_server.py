@@ -1,4 +1,5 @@
 import pytest
+import os
 from fastapi.testclient import TestClient
 
 
@@ -14,9 +15,13 @@ def mock_env_vars(monkeypatch):
     monkeypatch.setenv("Z_AI_API_KEY", "test_key.test_secret")
 
 
+# ── Original tests ────────────────────────────────────────────────────────────
+
+
 def test_health_check(client):
     response = client.get("/")
     assert response.status_code == 200
+    assert response.json()["version"] == "0.2.0"
 
 
 def test_upload_no_file(client):
@@ -48,8 +53,8 @@ def test_pointer_endpoint(client):
     assert response.json()["status"] == "pointer_queued"
 
 
-def test_extract_html_from_response():
-    from slide_server import extract_html_from_response
+def test_extract_final_html():
+    from slide_server import extract_final_html
 
     data = {
         "choices": [
@@ -70,7 +75,7 @@ def test_extract_html_from_response():
         ]
     }
 
-    result = extract_html_from_response(data)
+    result = extract_final_html(data)
     assert "<html>" in result
     assert "Test content" in result
 
@@ -88,7 +93,6 @@ def test_wrap_in_slide_html():
 
 def test_save_slide_to_file(tmp_path):
     from slide_server import save_slide_to_file
-    import os
 
     html = "<html><body>Test</body></html>"
     prompt = "test prompt"
@@ -103,3 +107,177 @@ def test_save_slide_to_file(tmp_path):
     assert saved_content == html
 
     os.remove(result)
+
+
+# ── v0.2.0 new tests ─────────────────────────────────────────────────────────
+
+
+def test_formats_endpoint(client):
+    response = client.get("/formats")
+    assert response.status_code == 200
+    data = response.json()
+    ids = [f["id"] for f in data]
+    assert "slides" in ids
+    assert "poster" in ids
+    assert "worksheet" in ids
+    assert "rr" in ids
+
+
+def test_styles_list_includes_auto(client):
+    response = client.get("/styles")
+    assert response.status_code == 200
+    data = response.json()
+    ids = [s["id"] for s in data]
+    assert "auto" in ids
+
+
+def test_styles_list_includes_gitenglish(client):
+    response = client.get("/styles")
+    data = response.json()
+    ids = [s["id"] for s in data]
+    assert "gitenglish" in ids
+
+
+def test_get_style_detail(client):
+    response = client.get("/styles/gitenglish")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "gitEnglish Hub"
+    assert "#262424" in data["prompt_hint"]
+
+
+def test_get_nonexistent_style(client):
+    response = client.get("/styles/nonexistent-xyz")
+    assert response.status_code == 404
+
+
+def test_clean_agent_output_strips_fences():
+    from slide_server import clean_agent_output
+
+    raw = "```html\n<!DOCTYPE html><html><body>Hello</body></html>\n```"
+    result = clean_agent_output(raw)
+    assert result.startswith("<!DOCTYPE")
+    assert result.endswith("</html>")
+    assert "```" not in result
+
+
+def test_clean_agent_output_passthrough():
+    from slide_server import clean_agent_output
+
+    raw = "<!DOCTYPE html><html><body>Hello</body></html>"
+    result = clean_agent_output(raw)
+    assert result == raw
+
+
+def test_clean_agent_output_extracts_embedded_html():
+    from slide_server import clean_agent_output
+
+    raw = "Here is your slide:\n<!DOCTYPE html><html><body>Content here</body></html>"
+    result = clean_agent_output(raw)
+    assert result.startswith("<!DOCTYPE")
+
+
+def test_build_system_prompt_slides_auto():
+    from slide_server import build_system_prompt
+
+    prompt = build_system_prompt("slides", "auto")
+    assert "multi-slide" in prompt
+    assert "NO <script>" in prompt
+
+
+def test_build_system_prompt_gitenglish():
+    from slide_server import build_system_prompt
+
+    prompt = build_system_prompt("slides", "gitenglish")
+    assert "#262424" in prompt
+
+
+def test_build_system_prompt_worksheet():
+    from slide_server import build_system_prompt
+
+    prompt = build_system_prompt("worksheet", "auto")
+    assert "exercises" in prompt.lower()
+
+
+def test_build_system_prompt_rr():
+    from slide_server import build_system_prompt
+
+    prompt = build_system_prompt("rr", "auto")
+    assert "regenerate" in prompt.lower()
+
+
+def test_strip_to_fragment():
+    from slide_server import strip_to_fragment
+
+    html = "<!DOCTYPE html><html><head><style>p{color:red}</style></head><body><div><p>Hello</p></div></body></html>"
+    frag = strip_to_fragment(html)
+    assert "<p>Hello</p>" in frag
+    assert "color:red" in frag
+    assert "<!DOCTYPE" not in frag
+
+
+def test_strip_to_fragment_bare():
+    from slide_server import strip_to_fragment
+
+    html = "<div><p>Hello</p></div>"
+    frag = strip_to_fragment(html)
+    assert "<p>Hello</p>" in frag
+
+
+def test_export_fragment_endpoint(client):
+    response = client.post(
+        "/export/fragment",
+        json={
+            "html": "<!DOCTYPE html><html><head><style>p{color:red}</style></head><body><p>Hello</p></body></html>"
+        },
+    )
+    assert response.status_code == 200
+    frag = response.json()["fragment"]
+    assert "<p>Hello</p>" in frag
+    assert "<!DOCTYPE" not in frag
+
+
+def test_export_fragment_empty(client):
+    response = client.post("/export/fragment", json={"html": ""})
+    assert response.status_code == 400
+
+
+def test_save_and_delete_style(client):
+    response = client.post(
+        "/styles/save",
+        json={
+            "style": {
+                "id": "test-style-unit",
+                "name": "Test Style",
+                "prompt_hint": "Make it look like a test",
+                "css": {"bg": "#ffffff"},
+                "preview_colors": ["#ffffff"],
+            }
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["saved"] is True
+    assert response.json()["id"] == "test-style-unit"
+
+    # Verify it appears in the list
+    styles = client.get("/styles").json()
+    ids = [s["id"] for s in styles]
+    assert "test-style-unit" in ids
+
+    # Get full detail
+    detail = client.get("/styles/test-style-unit").json()
+    assert detail["name"] == "Test Style"
+
+    # Delete it
+    del_resp = client.delete("/styles/test-style-unit")
+    assert del_resp.status_code == 200
+
+    # Verify gone
+    styles2 = client.get("/styles").json()
+    ids2 = [s["id"] for s in styles2]
+    assert "test-style-unit" not in ids2
+
+
+def test_delete_nonexistent_style(client):
+    resp = client.delete("/styles/nonexistent-xyz")
+    assert resp.status_code == 404

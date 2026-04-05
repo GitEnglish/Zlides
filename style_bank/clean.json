@@ -1,0 +1,24 @@
+{
+  "id": "clean",
+  "name": "Clean",
+  "created_at": "2026-03-31",
+  "preview_colors": ["#ffffff", "#f8f9fa", "#2563eb", "#1e293b"],
+  "prompt_hint": "Use a clean, professional white theme. White background #ffffff, light gray sections #f8f9fa, primary accent #2563eb (blue), dark text #1e293b. Clean sans-serif typography with generous whitespace. Subtle borders and shadows. Modern card-based layout. Use inline CSS in a <style> tag only — no external CDN, no <script> tags.",
+  "css": {
+    "bg": "#ffffff",
+    "card": "#f8f9fa",
+    "text": "#1e293b",
+    "text_secondary": "#64748b",
+    "accent": "#2563eb",
+    "accent_hover": "#1d4ed8",
+    "border": "#e2e8f0",
+    "success": "#16a34a",
+    "danger": "#dc2626"
+  },
+  "fonts": {
+    "body": "system-ui, -apple-system, sans-serif",
+    "heading": "system-ui, -apple-system, sans-serif"
+  },
+  "card_style": "flat",
+  "print_css": "@media print { body { font-size: 12pt; } button[id='regenerate'] { display: none !important; } @page { margin: 2cm; size: A4; } }"
+}

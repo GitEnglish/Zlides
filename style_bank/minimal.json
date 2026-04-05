@@ -1,0 +1,24 @@
+{
+  "id": "minimal",
+  "name": "Minimal",
+  "created_at": "2026-03-31",
+  "preview_colors": ["#ffffff", "#000000", "#666666"],
+  "prompt_hint": "Use a minimal, typographic theme. Pure white background, black text, no decoration, no shadows, no colors except black and shades of gray. Focus on typography hierarchy — large headings, generous line height, clean spacing. Border-bottom on headings only. Monospace for code. Use inline CSS in a <style> tag only — no external CDN, no <script> tags.",
+  "css": {
+    "bg": "#ffffff",
+    "card": "#ffffff",
+    "text": "#000000",
+    "text_secondary": "#666666",
+    "accent": "#000000",
+    "accent_hover": "#333333",
+    "border": "#e0e0e0",
+    "success": "#000000",
+    "danger": "#000000"
+  },
+  "fonts": {
+    "body": "'Georgia', serif",
+    "heading": "system-ui, -apple-system, sans-serif"
+  },
+  "card_style": "none",
+  "print_css": "@media print { button[id='regenerate'] { display: none !important; } @page { margin: 2.5cm; size: A4; } }"
+}

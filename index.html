@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zlides Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
@@ -11,39 +12,61 @@
             display: flex; height: 100vh; background: #1e1e1e; color: #fff; 
         }
         #sidebar { 
-            width: 360px; display: flex; flex-direction: column; 
+            width: 380px; display: flex; flex-direction: column; 
             background: #252526; border-right: 1px solid #333; flex-shrink: 0;
         }
         #sidebar-header { 
-            background: #0e639c; padding: 12px; font-weight: bold; 
-            text-align: center; font-size: 16px;
-            position: relative;
+            background: linear-gradient(135deg, #0e639c, #1177bb); padding: 12px; font-weight: bold; 
+            text-align: center; font-size: 16px; position: relative;
         }
         #version-info {
-            position: absolute;
-            right: 8px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 10px;
-            opacity: 0.8;
-            font-weight: normal;
+            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+            font-size: 10px; opacity: 0.7; font-weight: normal;
         }
         #history { 
-            flex: 1; overflow-y: auto; padding: 12px; font-size: 13px; 
+            flex: 1; overflow-y: auto; padding: 12px; font-size: 15px; 
         }
         .msg { margin-bottom: 8px; padding: 8px 10px; border-radius: 6px; 
-            white-space: pre-wrap; word-wrap: break-word; }
+            white-space: pre-wrap; word-wrap: break-word; line-height: 1.5; }
         .msg.user { background: #0066cc; text-align: right; }
         .msg.agent { background: #3c3c3c; }
+        .msg.thinking { color: #bbb; font-style: italic; font-size: 14px; }
+        .msg.answer { color: #ddd; font-size: 15px; }
+        .msg.slide-event { color: #4caf50; font-size: 13px; }
         
         #input-area { 
             padding: 12px; background: #2d2d2d; display: flex; 
             flex-direction: column; gap: 8px; border-top: 1px solid #444;
-            max-height: 380px; overflow-y: auto;
+            max-height: 420px; overflow-y: auto;
+        }
+        
+        /* Format + Style selector rows */
+        .selector-row {
+            display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+        }
+        .selector-row .label {
+            font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;
+            min-width: 42px; line-height: 28px;
+        }
+        .selector-row .pill {
+            padding: 4px 10px; border-radius: 14px; font-size: 11px; cursor: pointer;
+            border: 1px solid #555; background: #3c3c3c; color: #ccc;
+            transition: all 0.15s; white-space: nowrap;
+        }
+        .selector-row .pill:hover { border-color: #888; color: #fff; }
+        .selector-row .pill.active { 
+            background: #0e639c; border-color: #0e639c; color: #fff; font-weight: 600;
+        }
+        .selector-row .pill.active-style {
+            background: #ff6600; border-color: #ff6600; color: #fff; font-weight: 600;
+        }
+        .pill .swatch {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            margin-right: 4px; vertical-align: middle;
         }
         
         .opts-row { display: flex; gap: 6px; flex-wrap: wrap; }
-        .opts-row > div { flex: 1; min-width: 80px; }
+        .opts-row > div { flex: 1; min-width: 70px; }
         .opts-row label { display: block; font-size: 10px; color: #888; margin-bottom: 2px; }
         .opts-row select, .opts-row input[type="number"] {
             width: 100%; padding: 5px; background: #1e1e1e; 
@@ -52,29 +75,25 @@
         
         .btn-row { display: flex; gap: 6px; }
         .btn-row button { 
-            flex: 1; padding: 8px; background: #0e639c; color: white; 
-            border: none; cursor: pointer; border-radius: 4px; font-size: 12px;
+            flex: 1; padding: 10px; background: #0e639c; color: white; 
+            border: none; cursor: pointer; border-radius: 4px; font-size: 13px;
+            transition: background 0.15s;
         }
         .btn-row button:hover { background: #1177bb; }
         .btn-row button.green { background: #28a745; }
+        .btn-row button.green:hover { background: #218838; }
         .btn-row button.red { background: #dc3545; }
+        .btn-row button.red:hover { background: #c82333; }
+        .btn-row button.orange { background: #fd7e14; }
+        .btn-row button.orange:hover { background: #e06b0a; }
+        .btn-row button:disabled { opacity: 0.5; cursor: not-allowed; }
         
         textarea { 
             width: 100%; height: 100px; border-radius: 4px; border: 1px solid #444; 
             padding: 8px; resize: vertical; font-family: monospace; font-size: 12px; 
             background: #1e1e1e; color: #fff; 
         }
-        
-        .btn-row { display: flex; gap: 6px; }
-        .btn-row button { 
-            flex: 1; padding: 10px; background: #0e639c; color: white; 
-            border: none; cursor: pointer; border-radius: 4px; font-size: 13px;
-        }
-        .btn-row button:hover { background: #1177bb; }
-        .btn-row button.green { background: #28a745; }
-        .btn-row button.red { background: #dc3545; }
-        .btn-row button.stop { background: #dc3545; }
-        .btn-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+        textarea:focus { border-color: #0e639c; outline: none; }
         
         #status { font-size: 11px; color: #888; text-align: right; }
 
@@ -84,40 +103,82 @@
             display: flex; justify-content: space-between; align-items: center;
         }
         #editor-toolbar h2 { margin: 0; font-size: 14px; color: #ccc; }
-        #slide-info { font-size: 12px; color: #888; }
         
-        #preview-container { flex: 1; padding: 20px; overflow: auto; }
-        #slide-stage { display: flex; justify-content: center; align-items: center; height: 100%; }
+        .toolbar-actions { display: flex; gap: 6px; align-items: center; }
+        .toolbar-actions button {
+            padding: 4px 10px; background: #444; color: #ccc; border: 1px solid #555;
+            cursor: pointer; border-radius: 4px; font-size: 11px;
+            transition: all 0.15s;
+        }
+        .toolbar-actions button:hover { background: #555; color: #fff; }
+        .toolbar-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .toolbar-actions button.accent { background: #ff6600; border-color: #ff6600; color: #fff; }
+        .toolbar-actions button.accent:hover { background: #e06b0a; }
+        
+        #slide-info { font-size: 12px; color: #888; margin-right: 10px; }
+        
+        #preview-container { flex: 1; padding: 0; overflow: auto; }
+        #slide-stage { display: flex; justify-content: center; align-items: flex-start; height: 100%; }
         
         #slide-frame {
-            width: 100%; max-width: 900px; aspect-ratio: 16/9;
-            background: white; border: none; border-radius: 4px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            width: 100%; height: 100%;
+            background: white; border: none;
         }
+
+        #slide-nav {
+            display: flex; justify-content: center; align-items: center;
+            gap: 12px; padding: 8px; background: #252526; border-top: 1px solid #333;
+        }
+        #slide-nav button {
+            padding: 6px 14px; background: #3c3c3c; color: #fff; border: 1px solid #555;
+            cursor: pointer; border-radius: 4px; font-size: 13px;
+        }
+        #slide-nav button:hover { background: #505050; }
+        #slide-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+        #slide-counter { font-size: 12px; color: #aaa; min-width: 80px; text-align: center; }
+
+        .kbd { 
+            background: #444; padding: 1px 5px; border-radius: 3px; font-size: 10px;
+            border: 1px solid #555; color: #aaa;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #28a745; color: white; padding: 10px 20px; border-radius: 6px;
+            font-size: 13px; z-index: 9999; opacity: 0; transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
     </style>
 </head>
 <body>
     <div id="sidebar">
-        <div id="sidebar-header">🎨 ZLIDES<span id="version-info">v0.1.0</span></div>
+        <div id="sidebar-header">ZLIDES<span id="version-info">v0.2.0</span></div>
         <div id="history">
-            <div class="msg agent">Ready! Describe your slide below.</div>
+            <div class="msg agent">Ready! Pick a format + style, describe what you want. <span class="kbd">Enter</span> to send, <span class="kbd">Shift+Enter</span> for newline.</div>
         </div>
         <div id="input-area">
-            <!-- System Prompt -->
-            <textarea id="system-prompt" placeholder="System prompt (optional) - e.g., 'You are a minimalist designer...'" 
-                style="height: 50px;"></textarea>
-            
+            <!-- Format selector -->
+            <div class="selector-row">
+                <span class="label">Format</span>
+                <span class="pill active" data-format="slides" onclick="selectFormat(this)">Slides</span>
+                <span class="pill" data-format="poster" onclick="selectFormat(this)">Poster</span>
+                <span class="pill" data-format="worksheet" onclick="selectFormat(this)">Worksheet</span>
+                <span class="pill" data-format="report" onclick="selectFormat(this)">Report</span>
+                <span class="pill" data-format="rr" onclick="selectFormat(this)">RR</span>
+            </div>
+
+            <!-- Style selector (populated from /styles) -->
+            <div class="selector-row" id="style-selector">
+                <span class="label">Style</span>
+                <!-- pills injected by loadStyles() -->
+            </div>
+
             <div class="opts-row">
                 <div>
                     <label>Pages</label>
                     <input type="number" id="page-count" min="1" max="20" placeholder="Auto">
-                </div>
-                <div>
-                    <label>Type</label>
-                    <select id="slide-type">
-                        <option value="slides">Slides</option>
-                        <option value="poster">Poster</option>
-                    </select>
                 </div>
                 <div>
                     <label>Layout</label>
@@ -127,27 +188,18 @@
                         <option value="two-column">Two Column</option>
                     </select>
                 </div>
-                <div>
-                    <label>Theme</label>
-                    <select id="slide-theme">
-                        <option value="">Auto</option>
-                        <option value="minimal">Minimal</option>
-                        <option value="dark">Dark</option>
-                    </select>
-                </div>
             </div>
             <div class="btn-row">
-                <button class="green" onclick="document.getElementById('file-input').click()">📎 Upload</button>
+                <button class="green" onclick="document.getElementById('file-input').click()">Upload</button>
                 <input type="file" id="file-input" style="display:none" onchange="uploadFile()">
             </div>
             
-            <!-- User Prompt -->
-            <textarea id="prompt" placeholder="What do you want on the slide? (e.g., 'A slide about photosynthesis')"></textarea>
+            <textarea id="prompt" placeholder="What do you want? (e.g., 'A worksheet on past tense verbs')"></textarea>
             
             <div class="btn-row">
-                <button id="gen-btn" onclick="sendCommand()">🎨 Generate</button>
-                <button id="stop-btn" class="stop" onclick="stopRequest()" disabled>⏹ Stop</button>
-                <button class="red" onclick="clearHistory()">🗑 Clear</button>
+                <button id="gen-btn" onclick="sendCommand()">Generate</button>
+                <button id="stop-btn" style="background:#dc3545" onclick="stopRequest()" disabled>Stop</button>
+                <button class="red" onclick="clearHistory()">Clear</button>
             </div>
             <div id="status">Ready</div>
         </div>
@@ -156,35 +208,135 @@
     <div id="editor-area">
         <div id="editor-toolbar">
             <h2>Preview</h2>
-            <span id="slide-info">No slides</span>
+            <div class="toolbar-actions">
+                <span id="slide-info">No slides</span>
+                <button onclick="exportPNG()" title="Export as PNG (Ctrl+S)">PNG</button>
+                <button onclick="exportHTML()" title="Download full HTML">HTML</button>
+                <button class="accent" onclick="copyForSanity()" title="Copy fragment for Sanity content field">Copy for Sanity</button>
+                <button onclick="openFullscreen()" title="Fullscreen preview (F11)">Fullscreen</button>
+                <button onclick="window.print()" title="Print / PDF">PDF</button>
+            </div>
         </div>
         <div id="preview-container">
             <div id="slide-stage">
-                <iframe id="slide-frame" sandbox="allow-scripts"></iframe>
+                <iframe id="slide-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
             </div>
+        </div>
+        <div id="slide-nav">
+            <button id="prev-btn" onclick="prevSlide()" disabled>Prev</button>
+            <span id="slide-counter">No slides</span>
+            <button id="next-btn" onclick="nextSlide()" disabled>Next</button>
         </div>
     </div>
 
+    <div class="toast" id="toast"></div>
+
     <script>
+        // ── State ──────────────────────────────────────────────────────────
         const historyDiv = document.getElementById('history');
         const promptBox = document.getElementById('prompt');
-        const systemPromptBox = document.getElementById('system-prompt');
         const pageCountBox = document.getElementById('page-count');
-        const slideTypeBox = document.getElementById('slide-type');
         const slideLayoutBox = document.getElementById('slide-layout');
-        const slideThemeBox = document.getElementById('slide-theme');
         const statusDiv = document.getElementById('status');
         const slideFrame = document.getElementById('slide-frame');
         const slideInfo = document.getElementById('slide-info');
         const genBtn = document.getElementById('gen-btn');
         const stopBtn = document.getElementById('stop-btn');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const slideCounter = document.getElementById('slide-counter');
         
-        const backendURL = 'http://localhost:8766/command';
-        const uploadURL = 'http://localhost:8766/upload';
+        const backendURL = 'http://localhost:2828/command';
+        const uploadURL = 'http://localhost:2828/upload';
+        const stylesURL = 'http://localhost:2828/styles';
+        const fragmentURL = 'http://localhost:2828/export/fragment';
         
         let currentSlides = [];
+        let currentSlideIdx = 0;
         let currentController = null;
-        
+        let selectedFormat = 'slides';
+        let selectedStyle = 'auto';
+        let availableStyles = [];
+
+        // ── Toast ──────────────────────────────────────────────────────────
+        function showToast(msg, duration = 2000) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), duration);
+        }
+
+        // ── Format selector ────────────────────────────────────────────────
+        function selectFormat(el) {
+            document.querySelectorAll('[data-format]').forEach(p => p.classList.remove('active'));
+            el.classList.add('active');
+            selectedFormat = el.dataset.format;
+        }
+
+        // ── Style selector ─────────────────────────────────────────────────
+        async function loadStyles() {
+            try {
+                const resp = await fetch(stylesURL);
+                availableStyles = await resp.json();
+                renderStylePills();
+            } catch (e) {
+                console.warn('Could not load styles:', e);
+            }
+        }
+
+        function renderStylePills() {
+            const container = document.getElementById('style-selector');
+            // Keep the label
+            container.innerHTML = '<span class="label">Style</span>';
+            availableStyles.forEach(s => {
+                const pill = document.createElement('span');
+                pill.className = 'pill' + (s.id === selectedStyle ? ' active-style' : '');
+                pill.dataset.style = s.id;
+                pill.onclick = () => selectStyle(s.id);
+
+                // Add color swatches if available
+                let inner = '';
+                if (s.preview_colors && s.preview_colors.length > 0) {
+                    s.preview_colors.slice(0, 4).forEach(c => {
+                        inner += `<span class="swatch" style="background:${c}"></span>`;
+                    });
+                }
+                inner += s.name;
+                pill.innerHTML = inner;
+                container.appendChild(pill);
+            });
+        }
+
+        function selectStyle(id) {
+            selectedStyle = id;
+            document.querySelectorAll('[data-style]').forEach(p => p.classList.remove('active-style'));
+            const target = document.querySelector(`[data-style="${id}"]`);
+            if (target) target.classList.add('active-style');
+        }
+
+        // ── Slide navigation ───────────────────────────────────────────────
+        function updateSlideNav() {
+            prevBtn.disabled = currentSlideIdx <= 0;
+            nextBtn.disabled = currentSlideIdx >= currentSlides.length - 1;
+            slideCounter.textContent = currentSlides.length > 0 
+                ? `${currentSlideIdx + 1} / ${currentSlides.length}` 
+                : 'No slides';
+            slideInfo.textContent = currentSlides.length > 0 
+                ? `Slide ${currentSlideIdx + 1} of ${currentSlides.length}` 
+                : 'No slides';
+        }
+
+        function showSlide(idx) {
+            if (idx >= 0 && idx < currentSlides.length) {
+                currentSlideIdx = idx;
+                slideFrame.srcdoc = currentSlides[idx].html;
+                updateSlideNav();
+            }
+        }
+
+        function prevSlide() { showSlide(currentSlideIdx - 1); }
+        function nextSlide() { showSlide(currentSlideIdx + 1); }
+
         function addMessage(text, type) {
             const div = document.createElement('div');
             div.className = `msg ${type}`;
@@ -193,29 +345,27 @@
             historyDiv.scrollTop = historyDiv.scrollHeight;
         }
 
+        // ── Main generation ────────────────────────────────────────────────
         async function sendCommand() {
             const text = promptBox.value.trim();
-            const systemPrompt = systemPromptBox.value.trim();
             if (!text) {
                 statusDiv.textContent = 'Enter a prompt first!';
                 return;
             }
             
-            // Disable generate, enable stop
             genBtn.disabled = true;
             stopBtn.disabled = false;
             
-            addMessage(text, 'user');
+            addMessage(`[${selectedFormat} / ${selectedStyle}] ${text}`, 'user');
             promptBox.value = '';
             statusDiv.textContent = 'Generating...';
             
             const thinkingDiv = document.createElement('div');
-            thinkingDiv.className = 'msg agent';
+            thinkingDiv.className = 'msg agent thinking';
             thinkingDiv.textContent = '[Thinking...]';
             historyDiv.appendChild(thinkingDiv);
             historyDiv.scrollTop = historyDiv.scrollHeight;
 
-            // Create abort controller for stopping
             currentController = new AbortController();
 
             try {
@@ -224,11 +374,10 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         message: text,
-                        system_prompt: systemPrompt,
+                        format: selectedFormat,
+                        style: selectedStyle,
                         page_count: pageCountBox.value ? parseInt(pageCountBox.value) : null,
-                        slide_type: slideTypeBox.value,
                         layout: slideLayoutBox.value,
-                        theme: slideThemeBox.value
                     }),
                     signal: currentController.signal
                 });
@@ -255,15 +404,36 @@
                             try {
                                 const data = JSON.parse(dataStr);
                                 
+                                if (data.type === 'thinking') {
+                                    thinkingDiv.textContent += data.text;
+                                    historyDiv.scrollTop = historyDiv.scrollHeight;
+                                }
+                                
+                                if (data.type === 'answer') {
+                                    let answerDiv = historyDiv.querySelector('.msg.answer');
+                                    if (!answerDiv) {
+                                        answerDiv = document.createElement('div');
+                                        answerDiv.className = 'msg agent answer';
+                                        historyDiv.appendChild(answerDiv);
+                                    }
+                                    answerDiv.textContent += data.text;
+                                    historyDiv.scrollTop = historyDiv.scrollHeight;
+                                }
+                                
+                                if (data.type === 'slide_page') {
+                                    // Suppress individual slide events - they're noise
+                                }
+                                
                                 if (data.type === 'final_html') {
                                     const html = data.html;
                                     slideFrame.srcdoc = html;
                                     currentSlides.push({ html, title: text });
-                                    slideInfo.textContent = `Slide 1 of ${currentSlides.length}`;
-                                    statusDiv.textContent = '✅ Done!';
-                                    thinkingDiv.textContent = '[Complete]';
+                                    currentSlideIdx = currentSlides.length - 1;
+                                    updateSlideNav();
+                                    statusDiv.textContent = 'Done!';
+                                    thinkingDiv.textContent = `[Complete — ${selectedFormat} / ${selectedStyle}]`;
+                                    thinkingDiv.className = 'msg agent';
                                     
-                                    // Re-enable buttons
                                     genBtn.disabled = false;
                                     stopBtn.disabled = true;
                                     currentController = null;
@@ -271,6 +441,7 @@
                                 }
                                 if (data.type === 'error') {
                                     thinkingDiv.textContent = 'Error: ' + data.text;
+                                    thinkingDiv.className = 'msg agent';
                                     statusDiv.textContent = 'Error';
                                 }
                             } catch (e) {}
@@ -281,12 +452,12 @@
                 statusDiv.textContent = 'Done';
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    statusDiv.textContent = '⏹ Stopped';
+                    statusDiv.textContent = 'Stopped';
                     thinkingDiv.textContent = '[Stopped]';
                 } else {
                     statusDiv.textContent = 'Error: ' + err.message;
                     thinkingDiv.textContent = 'Error: ' + err.message;
-                    addMessage('Connection error - make sure server is running on port 8766', 'agent');
+                    addMessage('Connection error — is the server running on port 2828?', 'agent');
                 }
             } finally {
                 genBtn.disabled = false;
@@ -298,10 +469,11 @@
         function stopRequest() {
             if (currentController) {
                 currentController.abort();
-                statusDiv.textContent = '⏹ Stopping...';
+                statusDiv.textContent = 'Stopping...';
             }
         }
 
+        // ── Upload ─────────────────────────────────────────────────────────
         async function uploadFile() {
             const fileInput = document.getElementById('file-input');
             if (!fileInput.files.length) return;
@@ -314,34 +486,122 @@
                 const response = await fetch(uploadURL, { method: 'POST', body: formData });
                 const data = await response.json();
                 statusDiv.textContent = data.id ? 'Uploaded: ' + data.id : 'Done';
-                addMessage('File uploaded', 'agent');
+                addMessage('File uploaded: ' + fileInput.files[0].name, 'agent');
             } catch (e) {
                 statusDiv.textContent = 'Upload failed';
             }
             fileInput.value = '';
         }
 
+        // ── Clear ──────────────────────────────────────────────────────────
         function clearHistory() {
             if (confirm('Clear all?')) {
                 currentSlides = [];
-                slideFrame.srcdoc = '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f5f5f5;color:#999;"><h3>No slides</h3></body></html>';
+                currentSlideIdx = 0;
+                slideFrame.srcdoc = '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f5f5f5;color:#999;"><h3>Slide Preview</h3></body></html>';
                 historyDiv.innerHTML = '<div class="msg agent">Cleared</div>';
-                slideInfo.textContent = 'No slides';
+                updateSlideNav();
                 statusDiv.textContent = 'Ready';
             }
         }
 
+        // ── Export ─────────────────────────────────────────────────────────
+        async function exportPNG() {
+            if (!currentSlides.length) return;
+            try {
+                statusDiv.textContent = 'Capturing...';
+                const iframeDoc = slideFrame.contentDocument || slideFrame.contentWindow.document;
+                const canvas = await html2canvas(iframeDoc.body, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    width: slideFrame.clientWidth,
+                    height: slideFrame.clientHeight,
+                });
+                const link = document.createElement('a');
+                link.download = `slide_${currentSlideIdx + 1}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                statusDiv.textContent = 'PNG exported!';
+            } catch (e) {
+                statusDiv.textContent = 'Export failed: ' + e.message;
+            }
+        }
+
+        function exportHTML() {
+            if (!currentSlides.length) return;
+            const html = currentSlides[currentSlideIdx].html;
+            const blob = new Blob([html], { type: 'text/html' });
+            const link = document.createElement('a');
+            link.download = `slide_${currentSlideIdx + 1}.html`;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        async function copyForSanity() {
+            if (!currentSlides.length) {
+                showToast('No slide to copy');
+                return;
+            }
+            try {
+                const html = currentSlides[currentSlideIdx].html;
+                const resp = await fetch(fragmentURL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ html }),
+                });
+                if (!resp.ok) throw new Error('Fragment export failed');
+                const data = await resp.json();
+                const fragment = data.fragment;
+                
+                await navigator.clipboard.writeText(fragment);
+                showToast('Fragment copied — paste into Sanity content field');
+                statusDiv.textContent = 'Fragment copied to clipboard!';
+            } catch (e) {
+                // Fallback: copy raw HTML
+                try {
+                    await navigator.clipboard.writeText(currentSlides[currentSlideIdx].html);
+                    showToast('Raw HTML copied (fragment export failed)');
+                } catch (e2) {
+                    showToast('Copy failed: ' + e2.message);
+                }
+            }
+        }
+
+        function openFullscreen() {
+            if (!currentSlides.length) return;
+            const html = currentSlides[currentSlideIdx].html;
+            const w = window.open('', '_blank');
+            w.document.write(html);
+            w.document.close();
+        }
+
+        // ── Keyboard shortcuts ─────────────────────────────────────────────
         promptBox.addEventListener('keydown', e => {
-            // Enter = send, Shift+Enter = new line
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendCommand();
             }
-            // Shift+Enter does default (new line) - no handler needed
+        });
+
+        document.addEventListener('keydown', e => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 's') {
+                    e.preventDefault();
+                    exportPNG();
+                }
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (!genBtn.disabled) sendCommand();
+                }
+            }
+            if (e.key === 'ArrowLeft' && !e.target.closest('textarea, input')) prevSlide();
+            if (e.key === 'ArrowRight' && !e.target.closest('textarea, input')) nextSlide();
         });
         
-        // Fetch version from backend
-        fetch('http://localhost:8766/version')
+        // ── Init ───────────────────────────────────────────────────────────
+        fetch('http://localhost:2828/version')
             .then(r => r.json())
             .then(data => {
                 if (data.version && data.git_commit) {
@@ -349,10 +609,11 @@
                         `v${data.version} (${data.git_commit})`;
                 }
             })
-            .catch(() => {/* ignore */});
+            .catch(() => {});
         
-        // Init
-        slideFrame.srcdoc = '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f5f5f5;color:#999;"><h3>Slide Preview</h3></body></html>';
+        loadStyles();
+
+        slideFrame.srcdoc = '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f5f5f5;color:#999;font-family:sans-serif;"><div style="text-align:center"><h3>Slide Preview</h3><p style="margin-top:8px;font-size:13px;">Pick format + style, describe what you want, hit Generate</p></div></body></html>';
     </script>
 </body>
 </html>
