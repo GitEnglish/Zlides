@@ -535,8 +535,8 @@ async def send_command(request: ChatRequest):
 
     # Page count instruction
     page_instruction = ""
-    if request.page_count:
-        page_instruction = f"\nCreate exactly {request.page_count} {'slides' if request.format == 'slides' else 'sections'}."
+    effective_page_count = request.page_count or 5
+    page_instruction = f"\nCreate exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
     if request.layout:
         page_instruction += f" Layout preference: {request.layout}."
 
@@ -559,8 +559,7 @@ async def send_command(request: ChatRequest):
     if request.web_search:
         payload["tools"] = [{"type": "web_search", "web_search": {"enable": True}}]
 
-    if request.page_count and request.page_count > 1:
-        payload["max_pages"] = request.page_count
+    payload["max_pages"] = effective_page_count
 
     # Continue conversation on edit requests
     if conversation_id and any(

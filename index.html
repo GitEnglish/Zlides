@@ -8,16 +8,25 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-            display: flex; height: 100vh; background: #1e1e1e; color: #fff; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            display: flex; height: 100vh; background: #0d0d0d; color: #f0f0f0; 
         }
         #sidebar { 
             width: 380px; display: flex; flex-direction: column; 
-            background: #252526; border-right: 1px solid #333; flex-shrink: 0;
+            background: linear-gradient(180deg, #1a1a1f 0%, #151519 100%);
+            border-right: 1px solid #2a2a30; flex-shrink: 0;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.4);
         }
         #sidebar-header { 
             background: linear-gradient(135deg, #0e639c, #1177bb); padding: 12px; font-weight: bold; 
             text-align: center; font-size: 16px; position: relative;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        #sidebar-header img {
+            height: 42px; width: auto;
+            background: #000;
+            padding: 4px 10px;
+            border-radius: 6px;
         }
         #version-info {
             position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
@@ -26,10 +35,20 @@
         #history { 
             flex: 1; overflow-y: auto; padding: 12px; font-size: 15px; 
         }
-        .msg { margin-bottom: 8px; padding: 8px 10px; border-radius: 6px; 
-            white-space: pre-wrap; word-wrap: break-word; line-height: 1.5; }
-        .msg.user { background: #0066cc; text-align: right; }
-        .msg.agent { background: #3c3c3c; }
+        .msg { 
+            margin-bottom: 10px; padding: 10px 14px; border-radius: 12px; 
+            white-space: pre-wrap; word-wrap: break-word; line-height: 1.5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .msg.user { 
+            background: linear-gradient(135deg, #0066cc, #0077e6); 
+            text-align: right;
+            border-bottom-right-radius: 4px;
+        }
+        .msg.agent { 
+            background: linear-gradient(135deg, #2f2f35, #26262b);
+            border-bottom-left-radius: 4px;
+        }
         .msg.thinking { color: #bbb; font-style: italic; font-size: 14px; }
         .msg.answer { color: #ddd; font-size: 15px; }
         .msg.slide-event { color: #4caf50; font-size: 13px; }
@@ -42,62 +61,142 @@
         
         /* Format + Style selector rows */
         .selector-row {
-            display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+            display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;
+        }
+        .selector-row .pill {
+            padding: 6px 14px; border-radius: 20px; font-size: 12px; cursor: pointer;
+            border: 1px solid #3a3a40; background: #252529; color: #a0a0a8;
+            transition: all 0.2s ease; white-space: nowrap;
+        }
+        .selector-row .pill:hover { border-color: #555; color: #fff; background: #2f2f35; }
+        .selector-row .pill.active { 
+            background: linear-gradient(135deg, #0e639c, #1177bb); 
+            border-color: #0e639c; color: #fff; font-weight: 500;
+            box-shadow: 0 2px 8px rgba(14, 99, 156, 0.3);
+        }
+        .selector-row .pill.active-style {
+            background: linear-gradient(135deg, #ff6600, #ff8533); 
+            border-color: #ff6600; color: #fff; font-weight: 500;
+            box-shadow: 0 2px 8px rgba(255, 102, 0, 0.3);
+        }
+        
+        .opts-row { display: flex; gap: 8px; margin-bottom: 10px; }
+        .opts-row input[type="number"] {
+            width: 70px; padding: 8px 10px; background: #1e1e22; 
+            border: 1px solid #3a3a40; color: #e8e8e8; border-radius: 8px; 
+            font-size: 12px; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .opts-row input[type="number"]:focus {
+            border-color: #0e639c; box-shadow: 0 0 0 2px rgba(14, 99, 156, 0.2); outline: none;
+        }
+        .opts-row select {
+            flex: 1; padding: 8px 10px; background: #1e1e22; 
+            border: 1px solid #3a3a40; color: #e8e8e8; border-radius: 8px; 
+            font-size: 12px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .opts-row select:focus {
+            border-color: #0e639c; box-shadow: 0 0 0 2px rgba(14, 99, 156, 0.2); outline: none;
+        }
+        .opts-row .upload-btn {
+            padding: 8px 16px; background: linear-gradient(135deg, #28a745, #34ce57);
+            border: none; border-radius: 8px; color: white; cursor: pointer;
+            font-size: 12px; font-weight: 500; transition: all 0.2s ease;
+        }
+        .opts-row .upload-btn:hover {
+            background: linear-gradient(135deg, #34ce57, #3ddc63);
         }
         .selector-row .label {
             font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;
             min-width: 42px; line-height: 28px;
         }
         .selector-row .pill {
-            padding: 4px 10px; border-radius: 14px; font-size: 11px; cursor: pointer;
-            border: 1px solid #555; background: #3c3c3c; color: #ccc;
-            transition: all 0.15s; white-space: nowrap;
+            padding: 5px 12px; border-radius: 20px; font-size: 11px; cursor: pointer;
+            border: 1px solid #3a3a40; background: #252529; color: #a0a0a8;
+            transition: all 0.2s ease; white-space: nowrap;
         }
-        .selector-row .pill:hover { border-color: #888; color: #fff; }
+        .selector-row .pill:hover { 
+            border-color: #555; 
+            color: #fff; 
+            background: #2f2f35;
+            transform: translateY(-1px);
+        }
+
         .selector-row .pill.active { 
-            background: #0e639c; border-color: #0e639c; color: #fff; font-weight: 600;
+            background: linear-gradient(135deg, #0e639c, #1177bb); 
+            border-color: #0e639c; color: #fff; font-weight: 600;
+            box-shadow: 0 2px 8px rgba(14, 99, 156, 0.3);
         }
         .selector-row .pill.active-style {
-            background: #ff6600; border-color: #ff6600; color: #fff; font-weight: 600;
+            background: linear-gradient(135deg, #ff6600, #ff8533); 
+            border-color: #ff6600; color: #fff; font-weight: 600;
+            box-shadow: 0 2px 8px rgba(255, 102, 0, 0.3);
         }
         .pill .swatch {
             display: inline-block; width: 8px; height: 8px; border-radius: 50%;
             margin-right: 4px; vertical-align: middle;
         }
         
-        .opts-row { display: flex; gap: 6px; flex-wrap: wrap; }
-        .opts-row > div { flex: 1; min-width: 70px; }
-        .opts-row label { display: block; font-size: 10px; color: #888; margin-bottom: 2px; }
-        .opts-row select, .opts-row input[type="number"] {
-            width: 100%; padding: 5px; background: #1e1e1e; 
-            border: 1px solid #444; color: #fff; border-radius: 4px; font-size: 12px;
-        }
+
         
-        .btn-row { display: flex; gap: 6px; }
+        .btn-row { display: flex; gap: 8px; margin-bottom: 10px; }
+        .btn-row button { flex: 1; }
         .btn-row button { 
-            flex: 1; padding: 10px; background: #0e639c; color: white; 
-            border: none; cursor: pointer; border-radius: 4px; font-size: 13px;
-            transition: background 0.15s;
+            padding: 12px 16px; background: linear-gradient(135deg, #0e639c, #1177bb); 
+            color: white; border: none; cursor: pointer; border-radius: 10px; font-size: 14px;
+            font-weight: 500; transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(14, 99, 156, 0.25);
         }
-        .btn-row button:hover { background: #1177bb; }
-        .btn-row button.green { background: #28a745; }
-        .btn-row button.green:hover { background: #218838; }
-        .btn-row button.red { background: #dc3545; }
-        .btn-row button.red:hover { background: #c82333; }
+        .btn-row button:hover { 
+            background: linear-gradient(135deg, #1177bb, #138fd0);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(14, 99, 156, 0.35);
+        }
+        .btn-row button:active { transform: translateY(0); }
+        .btn-row button.green, .upload-btn { 
+            background: linear-gradient(135deg, #28a745, #34ce57);
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.25);
+        }
+        .btn-row button.green:hover, .upload-btn:hover { 
+            background: linear-gradient(135deg, #34ce57, #3ddc63);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.35);
+        }
+        .btn-row button.red, .btn-row button.stop-btn { 
+            background: linear-gradient(135deg, #dc3545, #e85d6a);
+            box-shadow: 0 2px 8px rgba(220, 53, 69, 0.25);
+        }
+        .btn-row button.red:hover, .btn-row button.stop-btn:hover { 
+            background: linear-gradient(135deg, #e85d6a, #f0707a);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.35);
+        }
+        .btn-row button.stop-btn:disabled {
+            background: linear-gradient(135deg, #5c3a3a, #4a3030);
+            box-shadow: none;
+            opacity: 0.5;
+        }
         .btn-row button.orange { background: #fd7e14; }
         .btn-row button.orange:hover { background: #e06b0a; }
         .btn-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-row:last-of-type { margin-bottom: 0; }
         
         textarea { 
-            width: 100%; height: 100px; border-radius: 4px; border: 1px solid #444; 
-            padding: 8px; resize: vertical; font-family: monospace; font-size: 12px; 
-            background: #1e1e1e; color: #fff; 
+            width: 100%; min-height: 120px; height: 140px; border-radius: 10px; border: 1px solid #3a3a40; 
+            padding: 12px 14px; resize: vertical; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; 
+            background: #1a1a1f; color: #e8e8e8; margin-bottom: 10px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            line-height: 1.6;
         }
-        textarea:focus { border-color: #0e639c; outline: none; }
+        textarea:focus { 
+            border-color: #0e639c; 
+            box-shadow: 0 0 0 3px rgba(14, 99, 156, 0.15);
+            outline: none;
+        }
         
-        #status { font-size: 11px; color: #888; text-align: right; }
+        #status { font-size: 11px; color: #888; text-align: right; margin-top: 4px; }
 
-        #editor-area { flex: 1; display: flex; flex-direction: column; background: #2d2d2d; }
+        #editor-area { 
+            flex: 1; display: flex; flex-direction: column; 
+            background: linear-gradient(135deg, #1f1f24 0%, #1a1a1f 100%);
+        }
         #editor-toolbar {
             background: #333; padding: 8px 16px; border-bottom: 1px solid #444;
             display: flex; justify-content: space-between; align-items: center;
@@ -106,14 +205,28 @@
         
         .toolbar-actions { display: flex; gap: 6px; align-items: center; }
         .toolbar-actions button {
-            padding: 4px 10px; background: #444; color: #ccc; border: 1px solid #555;
-            cursor: pointer; border-radius: 4px; font-size: 11px;
-            transition: all 0.15s;
+            padding: 10px 18px; background: linear-gradient(135deg, #3a3a40, #2f2f35); 
+            color: #e8e8e8; border: 1px solid #4a4a50;
+            cursor: pointer; border-radius: 10px; font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .toolbar-actions button:hover { 
+            background: linear-gradient(135deg, #4a4a50, #3a3a40);
+            border-color: #5a5a60;
+            transform: translateY(-1px);
         }
         .toolbar-actions button:hover { background: #555; color: #fff; }
         .toolbar-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
-        .toolbar-actions button.accent { background: #ff6600; border-color: #ff6600; color: #fff; }
-        .toolbar-actions button.accent:hover { background: #e06b0a; }
+        .toolbar-actions button.accent { 
+            background: linear-gradient(135deg, #ff6600, #ff8533); 
+            border-color: #ff6600; color: #fff;
+            box-shadow: 0 2px 8px rgba(255, 102, 0, 0.25);
+        }
+        .toolbar-actions button.accent:hover { 
+            background: linear-gradient(135deg, #ff8533, #ff9955);
+            box-shadow: 0 4px 12px rgba(255, 102, 0, 0.35);
+        }
         
         #slide-info { font-size: 12px; color: #888; margin-right: 10px; }
         
@@ -127,13 +240,19 @@
 
         #slide-nav {
             display: flex; justify-content: center; align-items: center;
-            gap: 12px; padding: 8px; background: #252526; border-top: 1px solid #333;
+            gap: 12px; padding: 10px; background: #1a1a1f; border-top: 1px solid #2a2a30;
         }
         #slide-nav button {
-            padding: 6px 14px; background: #3c3c3c; color: #fff; border: 1px solid #555;
-            cursor: pointer; border-radius: 4px; font-size: 13px;
+            padding: 8px 18px; background: linear-gradient(135deg, #2f2f35, #252529); 
+            color: #e8e8e8; border: 1px solid #3a3a40;
+            cursor: pointer; border-radius: 8px; font-size: 13px;
+            transition: all 0.2s ease;
         }
-        #slide-nav button:hover { background: #505050; }
+        #slide-nav button:hover { 
+            background: linear-gradient(135deg, #3a3a40, #2f2f35);
+            border-color: #555;
+            transform: translateY(-1px);
+        }
         #slide-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
         #slide-counter { font-size: 12px; color: #aaa; min-width: 80px; text-align: center; }
 
@@ -154,14 +273,13 @@
 </head>
 <body>
     <div id="sidebar">
-        <div id="sidebar-header">ZLIDES<span id="version-info">v0.2.0</span></div>
+        <div id="sidebar-header"><img src="assets/gitenglish-brand.png" alt="gitEnglish" /> <span id="version-info">v0.2.0</span></div>
         <div id="history">
             <div class="msg agent">Ready! Pick a format + style, describe what you want. <span class="kbd">Enter</span> to send, <span class="kbd">Shift+Enter</span> for newline.</div>
         </div>
         <div id="input-area">
             <!-- Format selector -->
             <div class="selector-row">
-                <span class="label">Format</span>
                 <span class="pill active" data-format="slides" onclick="selectFormat(this)">Slides</span>
                 <span class="pill" data-format="poster" onclick="selectFormat(this)">Poster</span>
                 <span class="pill" data-format="worksheet" onclick="selectFormat(this)">Worksheet</span>
@@ -169,28 +287,17 @@
                 <span class="pill" data-format="rr" onclick="selectFormat(this)">RR</span>
             </div>
 
-            <!-- Style selector (populated from /styles) -->
-            <div class="selector-row" id="style-selector">
-                <span class="label">Style</span>
-                <!-- pills injected by loadStyles() -->
-            </div>
+            <!-- Style selector -->
+            <div class="selector-row" id="style-selector"></div>
 
             <div class="opts-row">
-                <div>
-                    <label>Pages</label>
-                    <input type="number" id="page-count" min="1" max="20" placeholder="Auto">
-                </div>
-                <div>
-                    <label>Layout</label>
-                    <select id="slide-layout">
-                        <option value="">Auto</option>
-                        <option value="title-content">Title+Content</option>
-                        <option value="two-column">Two Column</option>
-                    </select>
-                </div>
-            </div>
-            <div class="btn-row">
-                <button class="green" onclick="document.getElementById('file-input').click()">Upload</button>
+                <input type="number" id="page-count" min="1" max="20" value="5" placeholder="Pages">
+                <select id="slide-layout">
+                    <option value="">Layout: Auto</option>
+                    <option value="title-content">Title+Content</option>
+                    <option value="two-column">Two Column</option>
+                </select>
+                <button class="upload-btn" onclick="document.getElementById('file-input').click()" title="Upload">Upload</button>
                 <input type="file" id="file-input" style="display:none" onchange="uploadFile()">
             </div>
             
@@ -198,7 +305,7 @@
             
             <div class="btn-row">
                 <button id="gen-btn" onclick="sendCommand()">Generate</button>
-                <button id="stop-btn" style="background:#dc3545" onclick="stopRequest()" disabled>Stop</button>
+                <button id="stop-btn" class="stop-btn" onclick="stopRequest()" disabled>Stop</button>
                 <button class="red" onclick="clearHistory()">Clear</button>
             </div>
             <div id="status">Ready</div>
@@ -212,7 +319,6 @@
                 <span id="slide-info">No slides</span>
                 <button onclick="exportPNG()" title="Export as PNG (Ctrl+S)">PNG</button>
                 <button onclick="exportHTML()" title="Download full HTML">HTML</button>
-                <button class="accent" onclick="copyForSanity()" title="Copy fragment for Sanity content field">Copy for Sanity</button>
                 <button onclick="openFullscreen()" title="Fullscreen preview (F11)">Fullscreen</button>
                 <button onclick="window.print()" title="Print / PDF">PDF</button>
             </div>
@@ -273,6 +379,8 @@
             selectedFormat = el.dataset.format;
         }
 
+
+
         // ── Style selector ─────────────────────────────────────────────────
         async function loadStyles() {
             try {
@@ -286,23 +394,13 @@
 
         function renderStylePills() {
             const container = document.getElementById('style-selector');
-            // Keep the label
-            container.innerHTML = '<span class="label">Style</span>';
-            availableStyles.forEach(s => {
+            container.innerHTML = '';
+            availableStyles.forEach((s, idx) => {
                 const pill = document.createElement('span');
-                pill.className = 'pill' + (s.id === selectedStyle ? ' active-style' : '');
+                pill.className = 'pill' + (idx === 0 ? ' active-style' : '');
                 pill.dataset.style = s.id;
                 pill.onclick = () => selectStyle(s.id);
-
-                // Add color swatches if available
-                let inner = '';
-                if (s.preview_colors && s.preview_colors.length > 0) {
-                    s.preview_colors.slice(0, 4).forEach(c => {
-                        inner += `<span class="swatch" style="background:${c}"></span>`;
-                    });
-                }
-                inner += s.name;
-                pill.innerHTML = inner;
+                pill.textContent = s.name;
                 container.appendChild(pill);
             });
         }
@@ -347,6 +445,7 @@
 
         // ── Main generation ────────────────────────────────────────────────
         async function sendCommand() {
+            if (genBtn.disabled) return;
             const text = promptBox.value.trim();
             if (!text) {
                 statusDiv.textContent = 'Enter a prompt first!';
@@ -367,6 +466,7 @@
             historyDiv.scrollTop = historyDiv.scrollHeight;
 
             currentController = new AbortController();
+            let liveHtmlChunks = [];
 
             try {
                 const response = await fetch(backendURL, {
@@ -376,7 +476,7 @@
                         message: text,
                         format: selectedFormat,
                         style: selectedStyle,
-                        page_count: pageCountBox.value ? parseInt(pageCountBox.value) : null,
+                        page_count: parseInt(pageCountBox.value) || 5,
                         layout: slideLayoutBox.value,
                     }),
                     signal: currentController.signal
@@ -421,7 +521,11 @@
                                 }
                                 
                                 if (data.type === 'slide_page') {
-                                    // Suppress individual slide events - they're noise
+                                    liveHtmlChunks.push(data.html || '');
+                                    const combined = liveHtmlChunks.join('')
+                                        .replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                                    slideFrame.srcdoc = combined;
+                                    statusDiv.textContent = `Streaming... (${liveHtmlChunks.length} chunks)`;
                                 }
                                 
                                 if (data.type === 'final_html') {
@@ -599,7 +703,7 @@
             if (e.key === 'ArrowLeft' && !e.target.closest('textarea, input')) prevSlide();
             if (e.key === 'ArrowRight' && !e.target.closest('textarea, input')) nextSlide();
         });
-        
+
         // ── Init ───────────────────────────────────────────────────────────
         fetch('http://localhost:2828/version')
             .then(r => r.json())
