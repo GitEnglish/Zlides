@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#2b6cee",
+              "background-light": "#f6f6f8",
+              "background-dark": "#101622",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"],
+              "mono": ["JetBrains Mono", "monospace"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<title>Method Reference Guide</title>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased">
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+<!-- Header Section -->
+<header class="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+<div class="flex items-center p-4 justify-between">
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-300">arrow_back</span>
+</button>
+<h1 class="text-lg font-bold tracking-tight">Method Reference</h1>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-300">search</span>
+</button>
+</div>
+</div>
+<!-- Segmented Control / Tabs -->
+<div class="flex px-4 gap-6 overflow-x-auto no-scrollbar">
+<a class="flex flex-col items-center justify-center border-b-2 border-primary pb-3 pt-2" href="#">
+<p class="text-primary text-sm font-semibold">Overview</p>
+</a>
+<a class="flex flex-col items-center justify-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 pb-3 pt-2" href="#">
+<p class="text-sm font-semibold">Endpoints</p>
+</a>
+<a class="flex flex-col items-center justify-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 pb-3 pt-2" href="#">
+<p class="text-sm font-semibold">Webhooks</p>
+</a>
+<a class="flex flex-col items-center justify-center border-b-2 border-transparent text-slate-500 dark:text-slate-400 pb-3 pt-2" href="#">
+<p class="text-sm font-semibold">SDKs</p>
+</a>
+</div>
+</header>
+<main class="flex-1 p-4 space-y-6">
+<!-- Quick Start Card -->
+<section class="space-y-3">
+<div class="flex items-center gap-2 px-1">
+<span class="material-symbols-outlined text-primary text-xl">bolt</span>
+<h2 class="text-xl font-bold">Quick Start</h2>
+</div>
+<div class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+<div class="p-4">
+<p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4">
+                            Initialize the SDK with your project API key to begin authenticating requests and managing user sessions.
+                        </p>
+<div class="relative group">
+<div class="bg-slate-950 rounded-lg p-4 font-mono text-xs leading-6 text-blue-300 overflow-x-auto">
+<span class="text-purple-400">import</span> { <span class="text-yellow-200">Client</span> } <span class="text-purple-400">from</span> <span class="text-green-400">'@api/sdk'</span>;<br/>
+<br/>
+<span class="text-slate-500">// Initialize client</span><br/>
+<span class="text-purple-400">const</span> sdk = <span class="text-purple-400">new</span> <span class="text-yellow-200">Client</span>({<br/>
+                                  apiKey: <span class="text-green-400">'YOUR_API_KEY'</span>,<br/>
+                                  environment: <span class="text-green-400">'production'</span><br/>
+                                });
+                            </div>
+<button class="absolute top-3 right-3 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-sm p-2 rounded-md transition-all">
+<span class="material-symbols-outlined text-white text-sm">content_copy</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Full Integration Card -->
+<section class="space-y-3">
+<div class="flex items-center gap-2 px-1">
+<span class="material-symbols-outlined text-primary text-xl">layers</span>
+<h2 class="text-xl font-bold">Full Integration</h2>
+</div>
+<div class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+<div class="p-4">
+<p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4">
+                            Connect your backend to handle secure transactions and data synchronization with our RESTful endpoints.
+                        </p>
+<div class="relative group">
+<div class="bg-slate-950 rounded-lg p-4 font-mono text-xs leading-6 text-blue-300 overflow-x-auto">
+<span class="text-purple-400">await</span> sdk.<span class="text-blue-200">transactions</span>.<span class="text-blue-200">create</span>({<br/>
+                                  amount: <span class="text-orange-300">2500</span>,<br/>
+                                  currency: <span class="text-green-400">'USD'</span>,<br/>
+                                  metadata: { order_id: <span class="text-green-400">'#9821'</span> }<br/>
+                                });
+                            </div>
+<button class="absolute top-3 right-3 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-sm p-2 rounded-md transition-all">
+<span class="material-symbols-outlined text-white text-sm">content_copy</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Webhooks Card -->
+<section class="space-y-3">
+<div class="flex items-center gap-2 px-1">
+<span class="material-symbols-outlined text-primary text-xl">sync_alt</span>
+<h2 class="text-xl font-bold">Webhooks</h2>
+</div>
+<div class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+<div class="p-4">
+<p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4">
+                            Configure webhooks to receive real-time updates for payment success or failed authentication attempts.
+                        </p>
+<div class="relative group">
+<div class="bg-slate-950 rounded-lg p-4 font-mono text-xs leading-6 text-blue-300 overflow-x-auto">
+<span class="text-slate-500">// Express.js handler</span><br/>
+                                app.<span class="text-blue-200">post</span>(<span class="text-green-400">'/webhook'</span>, (req, res) =&gt; {<br/>
+                                  <span class="text-purple-400">const</span> event = req.body;<br/>
+                                  <span class="text-purple-400">if</span> (event.type === <span class="text-green-400">'payment.succeeded'</span>) {<br/>
+                                    <span class="text-blue-200">fulfillOrder</span>(event.data);<br/>
+                                  }<br/>
+                                  res.<span class="text-blue-200">status</span>(<span class="text-orange-300">200</span>).<span class="text-blue-200">end</span>();<br/>
+                                });
+                            </div>
+<button class="absolute top-3 right-3 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-sm p-2 rounded-md transition-all">
+<span class="material-symbols-outlined text-white text-sm">content_copy</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="sticky bottom-0 z-50 flex border-t border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-4 pb-6 pt-2">
+<a class="flex flex-1 flex-col items-center justify-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined text-2xl">menu_book</span>
+<p class="text-[10px] font-bold uppercase tracking-wider">Docs</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-center gap-1 text-slate-500 dark:text-slate-400" href="#">
+<span class="material-symbols-outlined text-2xl">terminal</span>
+<p class="text-[10px] font-bold uppercase tracking-wider">API</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-center gap-1 text-slate-500 dark:text-slate-400" href="#">
+<span class="material-symbols-outlined text-2xl">list_alt</span>
+<p class="text-[10px] font-bold uppercase tracking-wider">Logs</p>
+</a>
+<a class="flex flex-1 flex-col items-center justify-center gap-1 text-slate-500 dark:text-slate-400" href="#">
+<span class="material-symbols-outlined text-2xl">account_circle</span>
+<p class="text-[10px] font-bold uppercase tracking-wider">Account</p>
+</a>
+</nav>
+</div>
+</body></html>

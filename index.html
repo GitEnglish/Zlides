@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zlides Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="frontend/styles.css">
+</head>
+<body>
+    <div id="sidebar">
+        <div id="sidebar-header"><img src="assets/gitenglish-brand.png" alt="gitEnglish" /> <span id="version-info">v0.2.0</span></div>
+        <div id="sidebar-tabs">
+            <button class="sidebar-tab active" onclick="switchTab('chat')">Chat</button>
+            <button class="sidebar-tab" onclick="switchTab('saved')">Saved</button>
+        </div>
+        <div id="history">
+            <div class="msg agent">Ready! Pick a format + style, describe what you want. <span class="kbd">Enter</span> to send, <span class="kbd">Shift+Enter</span> for newline.</div>
+        </div>
+        <div id="saved-panel" class="hidden">
+            <div class="saved-header">
+                <span>Saved Slides</span>
+                <button class="saved-refresh" onclick="loadSavedSlides()" title="Refresh">&#8635;</button>
+            </div>
+            <div id="saved-list"></div>
+        </div>
+        <div id="input-area">
+            <!-- Format selector -->
+            <div class="selector-row">
+                <span class="pill active" data-format="slides" onclick="selectFormat(this)">Slides</span>
+                <span class="pill" data-format="poster" onclick="selectFormat(this)">Poster</span>
+                <span class="pill" data-format="worksheet" onclick="selectFormat(this)">Worksheet</span>
+                <span class="pill" data-format="report" onclick="selectFormat(this)">Report</span>
+                <span class="pill" data-format="rr" onclick="selectFormat(this)">RR</span>
+            </div>
+
+            <!-- Style selector -->
+            <div class="selector-row" id="style-selector"></div>
+
+            <div class="opts-row">
+                <input type="number" id="page-count" min="1" max="20" value="5" placeholder="Pages">
+                <select id="slide-layout">
+                    <option value="">Layout: Auto</option>
+                    <option value="title-content">Title+Content</option>
+                    <option value="two-column">Two Column</option>
+                </select>
+                <button class="upload-btn" onclick="document.getElementById('file-input').click()" title="Upload">Upload</button>
+                <input type="file" id="file-input" style="display:none" onchange="uploadFile()">
+            </div>
+
+            <textarea id="prompt" placeholder="What do you want? (e.g., 'A worksheet on past tense verbs')"></textarea>
+
+            <div class="btn-row">
+                <button id="gen-btn" onclick="sendCommand()">Generate</button>
+                <button id="stop-btn" class="stop-btn" onclick="stopRequest()" disabled>Stop</button>
+                <button class="red" onclick="clearHistory()">Clear</button>
+            </div>
+            <div id="status">Ready</div>
+        </div>
+    </div>
+
+        <div id="editor-area">
+        <div id="editor-toolbar">
+            <h2>Preview</h2>
+            <div class="toolbar-actions">
+                <span id="slide-info">No slides</span>
+                <button onclick="exportPNG()" title="Export as PNG (Ctrl+S)">PNG</button>
+                <button onclick="exportHTML()" title="Download full HTML">HTML</button>
+                <button onclick="openFullscreen()" title="Fullscreen preview (F11)">Fullscreen</button>
+                <button onclick="window.print()" title="Print / PDF">PDF</button>
+            </div>
+        </div>
+        <div id="preview-container">
+            <div id="slide-stage">
+                <iframe id="slide-frame" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+            </div>
+        </div>
+        <div id="slide-nav">
+            <button id="prev-btn" onclick="prevSlide()" disabled>Prev</button>
+            <span id="slide-counter">No slides</span>
+            <button id="next-btn" onclick="nextSlide()" disabled>Next</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="frontend/app.js"></script>
+</body>
+</html>
