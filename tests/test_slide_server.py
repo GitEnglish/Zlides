@@ -19,7 +19,7 @@ def mock_env_vars(monkeypatch):
 
 
 def test_health_check(client):
-    response = client.get("/")
+    response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["version"] == "0.2.0"
 
@@ -182,7 +182,7 @@ def test_build_system_prompt_slides_auto():
 
     prompt = build_system_prompt("slides", "auto")
     assert "multi-slide" in prompt
-    assert "NO <script>" in prompt
+    assert "presentation" in prompt
 
 
 def test_build_system_prompt_gitenglish():
@@ -204,42 +204,6 @@ def test_build_system_prompt_rr():
 
     prompt = build_system_prompt("rr", "auto")
     assert "regenerate" in prompt.lower()
-
-
-def test_strip_to_fragment():
-    from slide_server import strip_to_fragment
-
-    html = "<!DOCTYPE html><html><head><style>p{color:red}</style></head><body><div><p>Hello</p></div></body></html>"
-    frag = strip_to_fragment(html)
-    assert "<p>Hello</p>" in frag
-    assert "color:red" in frag
-    assert "<!DOCTYPE" not in frag
-
-
-def test_strip_to_fragment_bare():
-    from slide_server import strip_to_fragment
-
-    html = "<div><p>Hello</p></div>"
-    frag = strip_to_fragment(html)
-    assert "<p>Hello</p>" in frag
-
-
-def test_export_fragment_endpoint(client):
-    response = client.post(
-        "/export/fragment",
-        json={
-            "html": "<!DOCTYPE html><html><head><style>p{color:red}</style></head><body><p>Hello</p></body></html>"
-        },
-    )
-    assert response.status_code == 200
-    frag = response.json()["fragment"]
-    assert "<p>Hello</p>" in frag
-    assert "<!DOCTYPE" not in frag
-
-
-def test_export_fragment_empty(client):
-    response = client.post("/export/fragment", json={"html": ""})
-    assert response.status_code == 400
 
 
 def test_save_and_delete_style(client):

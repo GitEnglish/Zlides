@@ -1,7 +1,8 @@
 import httpx
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
 import os
@@ -110,75 +111,6 @@ def clean_agent_output(raw: str) -> str:
     return ""
 
 
-def strip_to_fragment(html: str) -> str:
-    """Strip DOCTYPE/html/head/body wrappers → fragment for Sanity.
-
-    Preserves <style> blocks from <head> so CSS survives the trip through
-    dangerouslySetInnerHTML + DOMPurify.
-    """
-    if not html:
-        return ""
-
-    text = html.strip()
-
-    # Remove DOCTYPE
-    if text.startswith("<!DOCTYPE"):
-        text = text[text.index(">") + 1 :].strip()
-
-    # Remove <html> wrapper
-    if text.startswith("<html"):
-        close = text.find(">")
-        if close >= 0:
-            text = text[close + 1 :].strip()
-        if text.endswith("</html>"):
-            text = text[:-7].strip()
-
-    # Remove <head>...</head> but extract <style> blocks first
-    head_start = text.find("<head")
-    if head_start >= 0:
-        head_end = text.find("</head>")
-        if head_end >= 0:
-            head_open_end = text.find(">", head_start)
-            if head_open_end >= 0:
-                head_content = text[head_open_end + 1 : head_end]
-            else:
-                head_content = ""
-
-            # Extract <style> blocks from head content
-            extracted_styles = []
-            pos = 0
-            while True:
-                s = head_content.find("<style", pos)
-                if s < 0:
-                    break
-                se = head_content.find("</style>", s)
-                if se < 0:
-                    break
-                extracted_styles.append(head_content[s : se + 8])
-                pos = se + 8
-
-            body_part = text[head_end + 7 :]
-            if extracted_styles:
-                text = "\n".join(extracted_styles) + "\n" + body_part
-            else:
-                text = body_part
-
-    # Remove <body> wrapper but keep its content
-    # Only strip <body> from the part after any extracted <style> blocks
-    body_start = text.find("<body")
-    if body_start >= 0:
-        body_open_end = text.find(">", body_start)
-        if body_open_end >= 0:
-            # Everything before <body> (likely <style> blocks) + body content
-            before_body = text[:body_start].strip()
-            inner = text[body_open_end + 1 :]
-            if inner.rstrip().endswith("</body>"):
-                inner = inner.rstrip()[:-7].strip()
-            text = (before_body + "\n" + inner).strip() if before_body else inner
-
-    return text
-
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
@@ -198,7 +130,7 @@ def get_git_version():
 
 
 def generate_token(apikey: str):
-    api_key, secret = apikey.split(".")
+    api_key, secret = apikey.split(".", 1)
     payload = {
         "api_key": api_key,
         "exp": int(round(time.time() * 1000)) + 10 * 60 * 1000,
@@ -411,6 +343,11 @@ class ChatRequest(BaseModel):
 
 @app.get("/")
 async def root():
+    return FileResponse("index.html")
+
+
+@app.get("/health")
+async def health():
     return {
         "status": "ok",
         "service": "Zlides API",
@@ -505,14 +442,40 @@ async def export_html(request: dict):
     return JSONResponse(content={"html": html})
 
 
-@app.post("/export/fragment")
-async def export_fragment(request: dict):
-    """Strip to DOMPurify-safe fragment (for Sanity content field)."""
-    html = request.get("html", "")
-    if not html:
-        raise HTTPException(status_code=400, detail="No HTML provided")
-    fragment = strip_to_fragment(html)
-    return JSONResponse(content={"fragment": fragment})
+# ── Saved Slides Endpoints ──────────────────────────────────────────────────
+
+
+@app.get("/saved")
+async def list_saved_slides():
+    """List all saved slides with metadata."""
+    saved_dir = Path(SAVED_SLIDES_DIR)
+    slides = []
+    for f in sorted(saved_dir.glob("*.html"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            content = f.read_text(encoding="utf-8")
+            title = f.stem
+            m = __import__("re").search(r"<title>(.*?)</title>", content)
+            if m:
+                title = m.group(1)
+            slides.append({
+                "filename": f.name,
+                "title": title,
+                "size": f.stat().st_size,
+                "modified": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+                "date": datetime.fromtimestamp(f.stat().st_mtime).strftime("%b %d, %H:%M"),
+            })
+        except Exception:
+            pass
+    return slides
+
+
+@app.get("/saved/{filename}")
+async def get_saved_slide(filename: str):
+    """Serve a saved slide HTML file."""
+    filepath = Path(SAVED_SLIDES_DIR) / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Slide not found")
+    return FileResponse(filepath)
 
 
 # ── Main Generation Endpoint ─────────────────────────────────────────────────
@@ -561,11 +524,44 @@ async def send_command(request: ChatRequest):
 
     payload["max_pages"] = effective_page_count
 
-    # Continue conversation on edit requests
-    if conversation_id and any(
+    # Safe max_tokens to prevent context-length crashes (cap at 1/3 of 200k context)
+    payload["max_tokens"] = 65000
+
+    # Layout whitespace control (ctrl_step): 0.7 = good balance of readability and richness
+    payload["ctrl_step"] = 0.7
+
+    # Determine if this is an edit request
+    is_edit_request = conversation_id and any(
         word in request.message.lower()
-        for word in ["edit", "change", "modify", "update", "fix", "adjust"]
-    ):
+        for word in [
+            "edit",
+            "change",
+            "modify",
+            "update",
+            "fix",
+            "adjust",
+            "reformat",
+            "layout",
+        ]
+    )
+
+    # Add optimizations: cache salting, preserved thinking, strict JSON, tool streaming
+    import secrets
+    import uuid
+
+    payload["extra_body"] = {
+        "cache_salt": secrets.token_urlsafe(32),
+        "thinking": {
+            "type": "disabled" if is_edit_request else "enabled",
+            "clear_thinking": False,
+        },
+        "tool_stream": True,
+    }
+    payload["response_format"] = {"type": "json_object"}
+    payload["requestId"] = str(uuid.uuid4())
+
+    # Continue conversation on edit requests
+    if is_edit_request:
         payload["conversation_id"] = conversation_id
     else:
         session_store["conversation_id"] = None
@@ -773,8 +769,8 @@ async def send_command(request: ChatRequest):
                                 request.message,
                             )
 
-                    # Save conversation_id
-                    if last_valid_chunk.get("conversation_id"):
+                    # Save conversation_id only for edit requests (continuations)
+                    if is_edit_request and last_valid_chunk.get("conversation_id"):
                         session_store["conversation_id"] = last_valid_chunk[
                             "conversation_id"
                         ]
@@ -860,6 +856,9 @@ async def ingest_style(request: dict):
 async def ingest_pointer(request: dict):
     session_store["pending_pointer"] = request.get("pointer", {})
     return {"status": "pointer_queued", "pointer": session_store["pending_pointer"]}
+
+
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
 
 if __name__ == "__main__":
