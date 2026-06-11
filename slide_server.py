@@ -75,6 +75,12 @@ def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
             base += (
                 f"\n\nStyle: {style.get('prompt_hint', style.get('name', style_id))}"
             )
+            css = style.get('css', {})
+            if css:
+                base += "\n\nCRITICAL COLOR PALETTE INSTRUCTIONS:\n"
+                base += "You must explicitly use these exact hex colors in your inline CSS styling:\n"
+                for k, v in css.items():
+                    base += f"- {k}: {v}\n"
 
     return base
 
@@ -499,7 +505,7 @@ async def send_command(request: ChatRequest):
     # Page count instruction
     page_instruction = ""
     effective_page_count = request.page_count or 5
-    page_instruction = f"\nCreate exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
+    page_instruction = f"\nCRITICAL: MUST create exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
     if request.layout:
         page_instruction += f" Layout preference: {request.layout}."
 
@@ -560,11 +566,9 @@ async def send_command(request: ChatRequest):
     payload["response_format"] = {"type": "json_object"}
     payload["requestId"] = str(uuid.uuid4())
 
-    # Continue conversation on edit requests
-    if is_edit_request:
+    # Always continue conversation if we have an ID
+    if conversation_id:
         payload["conversation_id"] = conversation_id
-    else:
-        session_store["conversation_id"] = None
 
     # Inject any queued style image
     style_image_id = session_store.pop("pending_style_image", None)
@@ -798,17 +802,28 @@ async def send_command(request: ChatRequest):
                                 request.message,
                             )
 
-                    # Save conversation_id only for edit requests (continuations)
-                    if is_edit_request and last_valid_chunk.get("conversation_id"):
+                    # Always save conversation_id for future requests
+                    if last_valid_chunk.get("conversation_id"):
                         session_store["conversation_id"] = last_valid_chunk[
                             "conversation_id"
                         ]
                         save_session(session_store)
 
-                    # Append print CSS from style bank if applicable
+                    # Inject --zlides-* CSS variables into the generated HTML
                     style_id = request.style or request.theme or "auto"
+                    styles = load_style_bank()
                     if style_id and style_id != "auto":
-                        styles = load_style_bank()
+                        sp = styles.get(style_id)
+                        if sp and sp.get("css"):
+                            css_vars = "\n".join([f"      --zlides-{k}: {v};" for k, v in sp["css"].items()])
+                            css_injection = f"\n<style>\n:root {{\n{css_vars}\n}}\n</style>\n"
+                            if "</head>" in slide_html:
+                                slide_html = slide_html.replace("</head>", f"{css_injection}</head>")
+                            else:
+                                slide_html = f"{css_injection}\n" + slide_html
+
+                    # Append print CSS from style bank if applicable
+                    if style_id and style_id != "auto":
                         sp = styles.get(style_id)
                         if sp and sp.get("print_css"):
                             print_css = sp["print_css"]
@@ -867,14 +882,17 @@ async def async_generate(request: ChatRequest):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/export/pdf")
-async def export_pdf(request: dict):
+@app.post("/export")
+async def export_conversation(request: dict):
     if not Z_AI_API_KEY:
         raise HTTPException(status_code=401, detail="Z_AI_API_KEY not configured")
 
     conversation_id = request.get("conversation_id")
     if not conversation_id:
         raise HTTPException(status_code=400, detail="conversation_id required")
+
+    include_pdf = request.get("include_pdf", True)
+    include_html = request.get("include_html", False)
 
     token = generate_token(Z_AI_API_KEY, exp_seconds=3600)
     headers = {
@@ -888,7 +906,8 @@ async def export_pdf(request: dict):
         "agent_id": "slides_glm_agent",
         "conversation_id": conversation_id,
         "custom_variables": {
-            "include_pdf": True
+            "include_pdf": include_pdf,
+            "include_html": include_html
         }
     }
 
@@ -899,8 +918,6 @@ async def export_pdf(request: dict):
                 raise HTTPException(status_code=response.status_code, detail=response.text)
 
             data = response.json()
-            # In a real app we'd parse the PDF link from data, but we'll return the whole data block
-            # or try to extract it depending on Z.AI's response format
             return {"status": "success", "data": data}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
