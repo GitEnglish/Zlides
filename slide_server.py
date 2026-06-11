@@ -35,7 +35,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # ── Formats & Styles ─────────────────────────────────────────────────────────
 
 FORMATS = {
@@ -45,7 +44,6 @@ FORMATS = {
     "report": "Create an HTML document/report. Structured with headings, paragraphs, lists, and tables as needed. Professional document layout suitable for printing.",
     "rr": "Create an HTML learning resource. Where content can be regenerated (exercises, example sentences, vocabulary lists, practice questions), place <button id='regenerate' data-prompt='SPECIFIC regeneration instruction here'> with a clear label. Do NOT put regenerate buttons on static content like instructions or explanations — only where it makes pedagogical sense to generate new variants.",
 }
-
 
 def load_style_bank():
     """Load all style packs from style_bank/ directory."""
@@ -57,7 +55,6 @@ def load_style_bank():
         except Exception as e:
             print(f"[StyleBank] Failed to load {f}: {e}")
     return styles
-
 
 def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
     """Build the system prompt from format + style selections."""
@@ -72,12 +69,14 @@ def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
         styles = load_style_bank()
         style = styles.get(style_id)
         if style:
-            base += (
-                f"\n\nStyle: {style.get('prompt_hint', style.get('name', style_id))}"
-            )
+            hint = style.get('prompt_hint', style.get('name', style_id))
+            css = style.get('css', {})
+            if css:
+                css_vars = "\n".join(f"  --zlides-{k}: {v};" for k, v in css.items())
+                hint += f"\n\nCRITICAL: You MUST use these exact CSS custom properties in your generated HTML:\n:root {{\n{css_vars}\n}}\nApply these colors to all relevant elements (background, cards, text, accents, borders)."
+            base += f"\n\nStyle: {hint}"
 
     return base
-
 
 def clean_agent_output(raw: str) -> str:
     """Clean the raw agent output — strip code fences, extract HTML."""
@@ -88,10 +87,8 @@ def clean_agent_output(raw: str) -> str:
 
     # Strip markdown code fences
     if text.startswith("```"):
-        # Remove opening fence
         first_newline = text.index("\n") if "\n" in text else len(text)
         text = text[first_newline + 1 :]
-        # Remove closing fence
         if text.rstrip().endswith("```"):
             text = text.rstrip()[:-3].rstrip()
 
@@ -110,9 +107,7 @@ def clean_agent_output(raw: str) -> str:
 
     return ""
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
-
 
 def get_git_version():
     try:
@@ -128,7 +123,6 @@ def get_git_version():
     except Exception:
         return "unknown"
 
-
 def generate_token(apikey: str):
     api_key, secret = apikey.split(".", 1)
     payload = {
@@ -143,9 +137,7 @@ def generate_token(apikey: str):
         headers={"alg": "HS256", "sign_type": "SIGN"},
     )
 
-
 SESSION_TTL_SECONDS = 30 * 60
-
 
 def load_session():
     if os.path.exists(SESSION_FILE):
@@ -160,15 +152,12 @@ def load_session():
             pass
     return {"conversation_id": None}
 
-
 def save_session(session):
     session["updated_at"] = time.time()
     with open(SESSION_FILE, "w") as f:
         json.dump(session, f)
 
-
 session_store = load_session()
-
 
 def save_slide_to_file(html: str, prompt: str):
     try:
@@ -188,7 +177,6 @@ def save_slide_to_file(html: str, prompt: str):
         return filepath
     except Exception as e:
         return f"save_failed: {e}"
-
 
 def wrap_in_slide_html(content: str, title: str = "Slide") -> str:
     content_stripped = content.strip()
@@ -235,7 +223,6 @@ li {{ margin-bottom: 10px; font-size: 1.1em; }}
 </style></head>
 <body>{html_content}</body></html>"""
 
-
 def combine_tool_pages(pages: list) -> str:
     """Combine HTML chunks from tool outputs into a single document.
 
@@ -277,7 +264,6 @@ def combine_tool_pages(pages: list) -> str:
             return combined[idx:]
 
     return ""
-
 
 def extract_final_html(data: dict) -> str:
     """Extract HTML from a complete (non-streaming) API response."""
@@ -321,9 +307,7 @@ def extract_final_html(data: dict) -> str:
 
     return ""
 
-
 # ── Request Models ───────────────────────────────────────────────────────────
-
 
 class ChatRequest(BaseModel):
     message: str
@@ -337,14 +321,11 @@ class ChatRequest(BaseModel):
     format: str = "slides"
     style: str = "auto"
 
-
 # ── Endpoints ────────────────────────────────────────────────────────────────
-
 
 @app.get("/")
 async def root():
     return FileResponse("index.html")
-
 
 @app.get("/health")
 async def health():
@@ -355,20 +336,16 @@ async def health():
         "git_commit": get_git_version(),
     }
 
-
 @app.get("/version")
 async def version():
     return {"version": VERSION, "git_commit": get_git_version()}
-
 
 @app.get("/formats")
 async def list_formats():
     """List available formats."""
     return [{"id": k, "description": v[:80]} for k, v in FORMATS.items()]
 
-
 # ── Style Bank Endpoints ─────────────────────────────────────────────────────
-
 
 @app.get("/styles")
 async def list_styles():
@@ -387,7 +364,6 @@ async def list_styles():
     # Always include "auto" as an option
     return [{"id": "auto", "name": "Auto", "preview_colors": []}] + result
 
-
 @app.get("/styles/{style_id}")
 async def get_style(style_id: str):
     """Get full style pack."""
@@ -395,7 +371,6 @@ async def get_style(style_id: str):
     if style_id not in styles:
         raise HTTPException(status_code=404, detail="Style not found")
     return styles[style_id]
-
 
 @app.post("/styles/save")
 async def save_style(request: dict):
@@ -419,7 +394,6 @@ async def save_style(request: dict):
     )
     return {"saved": True, "id": sid}
 
-
 @app.delete("/styles/{style_id}")
 async def delete_style(style_id: str):
     """Delete a style from the bank."""
@@ -429,9 +403,7 @@ async def delete_style(style_id: str):
     filepath.unlink()
     return {"deleted": True, "id": style_id}
 
-
 # ── Export Endpoints ─────────────────────────────────────────────────────────
-
 
 @app.post("/export/html")
 async def export_html(request: dict):
@@ -441,9 +413,7 @@ async def export_html(request: dict):
         raise HTTPException(status_code=400, detail="No HTML provided")
     return JSONResponse(content={"html": html})
 
-
 # ── Saved Slides Endpoints ──────────────────────────────────────────────────
-
 
 @app.get("/saved")
 async def list_saved_slides():
@@ -468,7 +438,6 @@ async def list_saved_slides():
             pass
     return slides
 
-
 @app.get("/saved/{filename}")
 async def get_saved_slide(filename: str):
     """Serve a saved slide HTML file."""
@@ -477,9 +446,7 @@ async def get_saved_slide(filename: str):
         raise HTTPException(status_code=404, detail="Slide not found")
     return FileResponse(filepath)
 
-
 # ── Main Generation Endpoint ─────────────────────────────────────────────────
-
 
 @app.post("/command")
 async def send_command(request: ChatRequest):
@@ -489,17 +456,17 @@ async def send_command(request: ChatRequest):
         "Accept-Language": "en-US,en",
     }
 
-    # Build system prompt from format + style
     system_prompt = build_system_prompt(
         fmt=request.format or request.slide_type or "slides",
         style_id=request.style or request.theme or "auto",
         language=request.language,
     )
 
-    # Page count instruction
+    # Page count instruction — strong directive, agent often skips weak requests
     page_instruction = ""
     effective_page_count = request.page_count or 5
-    page_instruction = f"\nCreate exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
+    page_label = 'slides' if request.format == 'slides' else 'sections'
+    page_instruction = f"\n\nCRITICAL: You MUST create exactly {effective_page_count} {page_label}. Do NOT create fewer or more. Each {page_label[:-1] if page_label.endswith('s') else page_label} must have unique, substantial content."
     if request.layout:
         page_instruction += f" Layout preference: {request.layout}."
 
@@ -560,11 +527,9 @@ async def send_command(request: ChatRequest):
     payload["response_format"] = {"type": "json_object"}
     payload["requestId"] = str(uuid.uuid4())
 
-    # Continue conversation on edit requests
-    if is_edit_request:
+    # Always continue conversation if we have a conversation_id
+    if conversation_id:
         payload["conversation_id"] = conversation_id
-    else:
-        session_store["conversation_id"] = None
 
     # Inject any queued style image
     style_image_id = session_store.pop("pending_style_image", None)
@@ -676,6 +641,12 @@ async def send_command(request: ChatRequest):
                                             )
                                             position = obj.get("position", [])
 
+                                            # Forward localized tool labels
+                                            tag_en = item.get("tag_en", "")
+                                            tag_cn = item.get("tag_cn", "")
+                                            if tag_en or tag_cn:
+                                                yield f"data: {json.dumps({'type': 'tool_label', 'tag_en': tag_en, 'tag_cn': tag_cn})}\n\n"
+
                                             # Decode escaped characters from API response
                                             if output and isinstance(output, str):
                                                 output = output.replace(
@@ -723,6 +694,15 @@ async def send_command(request: ChatRequest):
                     except Exception as e:
                         print(f"[Parse] SSE error: {e}")
 
+                # Forward usage and finish_reason from last chunk
+                if last_valid_chunk:
+                    usage = last_valid_chunk.get("usage")
+                    if usage:
+                        yield f"data: {json.dumps({'type': 'usage', 'usage': usage})}\n\n"
+                    finish_reason = last_valid_chunk.get("finish_reason")
+                    if finish_reason:
+                        yield f"data: {json.dumps({'type': 'finish', 'finish_reason': finish_reason})}\n\n"
+
                 # Debug: log what we received
                 print(
                     f"[DEBUG] Received {len(all_chunks)} chunks, {len(tool_html_pages)} tool HTML pages, {len(answer_texts)} answer texts"
@@ -769,27 +749,39 @@ async def send_command(request: ChatRequest):
                                 request.message,
                             )
 
-                    # Save conversation_id only for edit requests (continuations)
-                    if is_edit_request and last_valid_chunk.get("conversation_id"):
+                                    # Always save conversation_id so follow-up edits can continue
+                    if last_valid_chunk.get("conversation_id"):
                         session_store["conversation_id"] = last_valid_chunk[
                             "conversation_id"
                         ]
                         save_session(session_store)
 
-                    # Append print CSS from style bank if applicable
+                    # Inject style pack CSS overrides + print CSS
                     style_id = request.style or request.theme or "auto"
                     if style_id and style_id != "auto":
                         styles = load_style_bank()
                         sp = styles.get(style_id)
-                        if sp and sp.get("print_css"):
-                            print_css = sp["print_css"]
-                            if "</head>" in slide_html:
-                                slide_html = slide_html.replace(
-                                    "</head>", f"<style>{print_css}</style>\n</head>"
-                                )
-                            elif "</style>" in slide_html:
-                                slide_html = slide_html.replace(
-                                    "</style>", f"\n{print_css}\n</style>"
+                        if sp:
+                            css_block = ""
+                            # Generate CSS custom properties from style pack
+                            if sp.get("css"):
+                                css_vars = ":root {\n"
+                                for key, value in sp["css"].items():
+                                    css_vars += f"  --zlides-{key}: {value};\n"
+                                css_vars += "}\n"
+                                css_block += css_vars
+                            # Append print CSS
+                            if sp.get("print_css"):
+                                css_block += sp["print_css"]
+                            if css_block:
+                                css_style = f"<style id='zlides-style-override'>{css_block}</style>"
+                                if "</head>" in slide_html:
+                                    slide_html = slide_html.replace(
+                                        "</head>", f"{css_style}\n</head>"
+                                    )
+                                elif "</style>" in slide_html:
+                                    slide_html = slide_html.replace(
+                                        "</style>", f"\n{css_block}\n</style>"
                                 )
 
                     filepath = save_slide_to_file(slide_html, request.message)
@@ -804,9 +796,7 @@ async def send_command(request: ChatRequest):
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
-
 # ── Upload ────────────────────────────────────────────────────────────────────
-
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...), upload_type: str = "file"):
@@ -845,21 +835,59 @@ async def upload_file(file: UploadFile = File(...), upload_type: str = "file"):
 
     return result
 
-
 @app.post("/style")
 async def ingest_style(request: dict):
     session_store["pending_style"] = request.get("style", {})
     return {"status": "style_queued", "style": session_store["pending_style"]}
-
 
 @app.post("/pointer")
 async def ingest_pointer(request: dict):
     session_store["pending_pointer"] = request.get("pointer", {})
     return {"status": "pointer_queued", "pointer": session_store["pending_pointer"]}
 
+@app.post("/export")
+async def export_presentation(request: dict):
+    """Export presentation via conversation history API (PDF/HTML files from Z.AI)."""
+    if not Z_AI_API_KEY:
+        raise HTTPException(status_code=401, detail="Z_AI_API_KEY not configured")
+
+    conversation_id = request.get("conversation_id") or session_store.get(
+        "conversation_id"
+    )
+    if not conversation_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No conversation_id available. Generate slides first.",
+        )
+
+    include_pdf = request.get("include_pdf", False)
+    include_html = request.get("include_html", True)
+
+    async with httpx.AsyncClient(timeout=300.0) as client:
+        response = await client.post(
+            f"{ZAI_ENDPOINT}/conversation",
+            headers={
+                "Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "agent_id": "slides_glm_agent",
+                "conversation_id": conversation_id,
+                "custom_variables": {
+                    "include_pdf": include_pdf,
+                    "include_html": include_html,
+                },
+            },
+        )
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=500, detail=f"Export failed: {response.text}"
+        )
+
+    return response.json()
 
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
-
 
 if __name__ == "__main__":
     import uvicorn

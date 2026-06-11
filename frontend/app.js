@@ -22,6 +22,8 @@
         let selectedFormat = 'slides';
         let selectedStyle = 'auto';
         let availableStyles = [];
+        let totalTokens = 0;
+        let heartbeatTimer = null;
 
         // ── Toast ──────────────────────────────────────────────────────────
         function showToast(msg, duration = 2000) {
@@ -110,14 +112,15 @@
                 statusDiv.textContent = 'Enter a prompt first!';
                 return;
             }
-            
+
             genBtn.disabled = true;
             stopBtn.disabled = false;
-            
+            totalTokens = 0;
+
             addMessage(`[${selectedFormat} / ${selectedStyle}] ${text}`, 'user');
             promptBox.value = '';
             statusDiv.textContent = 'Generating...';
-            
+
             const thinkingDiv = document.createElement('div');
             thinkingDiv.className = 'msg agent thinking';
             thinkingDiv.textContent = '[Thinking...]';
@@ -127,6 +130,7 @@
             currentController = new AbortController();
             let liveHtmlChunks = [];
             let thinkingBuffer = '';
+            let finishReason = null;
 
             try {
                 const response = await fetch(backendURL, {
@@ -171,6 +175,25 @@
                                         historyDiv.scrollTop = historyDiv.scrollHeight;
                                         thinkingBuffer = '';
                                     }
+                                }
+
+                                if (data.type === 'usage' && data.usage) {
+                                    totalTokens = data.usage.total_tokens || totalTokens;
+                                    updateStatus();
+                                }
+
+                                if (data.type === 'finish' && data.finish_reason) {
+                                    finishReason = data.finish_reason;
+                                    if (data.finish_reason === 'sensitive') {
+                                        showToast('Content safety triggered — partial output shown', 4000);
+                                    }
+                                }
+
+                                if (data.type === 'tool_label' && data.tag_en) {
+                                    const tagDiv = document.createElement('div');
+                                    tagDiv.className = 'tool-tag';
+                                    tagDiv.innerHTML = `<span class="tag-icon"></span>${data.tag_en}`;
+                                    thinkingDiv.appendChild(tagDiv);
                                 }
                                 
                                 if (data.type === 'answer') {
@@ -224,13 +247,16 @@
                                     currentSlides.push({ html, title: text });
                                     currentSlideIdx = currentSlides.length - 1;
                                     updateSlideNav();
-                                    statusDiv.textContent = 'Done!';
-                                    thinkingDiv.textContent = `[Complete — ${selectedFormat} / ${selectedStyle}]`;
+
+                                    const badgeClass = finishReason === 'sensitive' ? 'sensitive' : 'stop';
+                                    const badgeText = finishReason === 'sensitive' ? 'Partial' : 'Complete';
+                                    thinkingDiv.innerHTML = `<span class="finish-badge ${badgeClass}">${badgeText}</span> — ${selectedFormat} / ${selectedStyle}`;
                                     thinkingDiv.className = 'msg agent';
-                                    
+
                                     genBtn.disabled = false;
                                     stopBtn.disabled = true;
                                     currentController = null;
+                                    startHeartbeat();
                                     return;
                                 }
                                 if (data.type === 'error') {
@@ -270,6 +296,18 @@
                 currentController.abort();
                 statusDiv.textContent = 'Stopping...';
             }
+        }
+
+        function updateStatus() {
+            const tokenInfo = totalTokens > 0 ? `<span>${totalTokens.toLocaleString()} tokens</span>` : '';
+            statusDiv.innerHTML = `<span>${statusDiv.textContent.split('·')[0].trim()}</span>${tokenInfo ? ' · ' + tokenInfo : ''}`;
+        }
+
+        function startHeartbeat() {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
+            heartbeatTimer = setInterval(() => {
+                fetch('/health').catch(() => {});
+            }, 60000);
         }
 
         // ── Upload ─────────────────────────────────────────────────────────
