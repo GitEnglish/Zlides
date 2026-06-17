@@ -16,7 +16,15 @@
   let files: FileList | null = null;
   let extractedMarkdown = "";
 
-  onMount(() => {
+  onMount(async () => {
+    // Load styles from the backend
+    try {
+      const resp = await fetch("/styles");
+      availableStyles = await resp.json();
+    } catch (e) {
+      console.warn("Could not load styles:", e);
+    }
+
     // Listen for RR format regeneration requests from the iframe
     window.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'regenerate') {
@@ -86,6 +94,55 @@
     }
   }
 
+  let currentController: AbortController | null = null;
+  let liveHtmlChunks: string[] = [];
+  let iframeElement: HTMLIFrameElement | null = null;
+  let thinkingBuffer = '';
+
+  // We'll define these fully in Step 3, but provide stubs to make TS happy
+  let chatMessages: any[] = [{ role: "agent", text: "Ready! Pick a format + style, describe what you want." }];
+  let selectedFormat = "slides";
+  let selectedStyle = "auto";
+  let pageCount = 5;
+  let slideLayout = "";
+  let availableStyles: any[] = [];
+
+  function renderLiveHtmlChunks() {
+    const combined = liveHtmlChunks.join('')
+        .replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    try {
+        const doc = iframeElement?.contentDocument;
+        if (doc && doc.body && doc.body.innerHTML.length > 0) {
+            const prevScroll = doc.documentElement.scrollTop || doc.body.scrollTop;
+            doc.body.innerHTML = combined;
+            doc.documentElement.scrollTop = doc.body.scrollTop = prevScroll;
+        } else {
+            iframeSrcDoc = combined;
+        }
+    } catch(e) {
+        iframeSrcDoc = combined;
+    }
+    status = `Streaming... (${liveHtmlChunks.length} chunks)`;
+  }
+
+  function addMessage(text: string, role: string) {
+    chatMessages = [...chatMessages, { role, text }];
+    // Ensure scrolling happens after DOM update
+    setTimeout(() => {
+      const historyDiv = document.getElementById("chat-history");
+      if (historyDiv) {
+        historyDiv.scrollTop = historyDiv.scrollHeight;
+      }
+    }, 10);
+  }
+
+  function stopRequest() {
+    if (currentController) {
+      currentController.abort();
+      status = 'Stopping...';
+    }
+  }
+
   async function generate() {
     if (!promptText.trim() && !extractedMarkdown) return;
     isGenerating = true;
@@ -104,21 +161,199 @@
       } catch (e) {
         status = "Batch failed.";
       }
-    } else {
-      status = "Generating (Mongoose Fast)...";
-      setTimeout(() => {
-        status = "Ready";
-      }, 2000);
+      isGenerating = false;
+      return;
     }
 
-    isGenerating = false;
+    const textToSend = promptText;
+    promptText = "";
+    status = "Generating...";
+    addMessage(`[${selectedFormat} / ${selectedStyle}] ${textToSend}`, 'user');
+    addMessage('[Thinking...]', 'thinking'); // placeholder
+
+    currentController = new AbortController();
+    liveHtmlChunks = [];
+    thinkingBuffer = '';
+
+    try {
+      const response = await fetch('/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: textToSend + (extractedMarkdown ? "\n\n" + extractedMarkdown : ""),
+          format: selectedFormat,
+          style: selectedStyle,
+          page_count: pageCount,
+          layout: slideLayout,
+        }),
+        signal: currentController.signal
+      });
+
+      if (!response.ok) throw new Error("Server error: " + response.status);
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const dataStr = line.substring(5).trim();
+              if (!dataStr || dataStr === '[DONE]') continue;
+
+              try {
+                const data = JSON.parse(dataStr);
+
+                if (data.type === 'thinking') {
+                  thinkingBuffer += data.text;
+                  if (thinkingBuffer.length > 20) {
+                    // Update the last thinking message
+                    const lastMsg = chatMessages[chatMessages.length - 1];
+                    if (lastMsg && lastMsg.role === 'thinking') {
+                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
+                      chatMessages = [...chatMessages];
+                    }
+                    thinkingBuffer = '';
+                  }
+                }
+
+                if (data.type === 'answer') {
+                  if (thinkingBuffer) {
+                    const lastMsg = chatMessages[chatMessages.length - 1];
+                    if (lastMsg && lastMsg.role === 'thinking') {
+                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
+                    }
+                    thinkingBuffer = '';
+                  }
+
+                  const lastMsg = chatMessages[chatMessages.length - 1];
+                  if (lastMsg && lastMsg.role === 'agent') {
+                    lastMsg.text += data.text;
+                    chatMessages = [...chatMessages];
+                  } else {
+                    addMessage(data.text, 'agent');
+                  }
+                }
+
+                if (data.type === 'slide_page') {
+                  if (thinkingBuffer) {
+                    const lastMsg = chatMessages[chatMessages.length - 1];
+                    if (lastMsg && lastMsg.role === 'thinking') {
+                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
+                    }
+                    thinkingBuffer = '';
+                  }
+                  liveHtmlChunks.push(data.html || '');
+                  renderLiveHtmlChunks();
+                }
+
+                if (data.type === 'slide_remove') {
+                  console.log("Removing slides at positions:", data.positions);
+                }
+
+                if (data.type === 'slide_replace') {
+                  if (thinkingBuffer) {
+                    const lastMsg = chatMessages[chatMessages.length - 1];
+                    if (lastMsg && lastMsg.role === 'thinking') {
+                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
+                    }
+                    thinkingBuffer = '';
+                  }
+                  liveHtmlChunks.push(data.html || '');
+                  renderLiveHtmlChunks();
+                }
+
+                if (data.type === 'slide_navigate') {
+                  if (data.position && data.position.length > 0) {
+                    currentSlideIndex = Math.max(0, data.position[0] - 1);
+                  }
+                }
+
+                if (data.type === 'final_html') {
+                  if (thinkingBuffer) {
+                    const lastMsg = chatMessages[chatMessages.length - 1];
+                    if (lastMsg && lastMsg.role === 'thinking') {
+                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
+                    }
+                    thinkingBuffer = '';
+                  }
+
+                  // Convert thinking message to agent message if it was just thinking
+                  const lastMsg = chatMessages[chatMessages.length - 1];
+                  if (lastMsg && lastMsg.role === 'thinking') {
+                    lastMsg.text = `[Complete — ${selectedFormat} / ${selectedStyle}]`;
+                    lastMsg.role = 'agent';
+                    chatMessages = [...chatMessages];
+                  }
+
+                  const html = data.html;
+                  iframeSrcDoc = html;
+                  slides = [...slides, { html, title: textToSend }];
+                  currentSlideIndex = slides.length - 1;
+                  status = 'Done!';
+
+                  isGenerating = false;
+                  currentController = null;
+                  return;
+                }
+
+                if (data.type === 'error') {
+                  if (thinkingBuffer) {
+                    const lastMsg = chatMessages[chatMessages.length - 1];
+                    if (lastMsg && lastMsg.role === 'thinking') {
+                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
+                    }
+                    thinkingBuffer = '';
+                  }
+
+                  const lastMsg = chatMessages[chatMessages.length - 1];
+                  if (lastMsg && lastMsg.role === 'thinking') {
+                    lastMsg.text = 'Error: ' + data.text;
+                    lastMsg.role = 'agent';
+                    chatMessages = [...chatMessages];
+                  } else {
+                     addMessage('Error: ' + data.text, 'agent');
+                  }
+                  status = 'Error';
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      }
+      status = 'Done';
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        status = 'Stopped';
+        const lastMsg = chatMessages[chatMessages.length - 1];
+        if (lastMsg && lastMsg.role === 'thinking') {
+          lastMsg.text = '[Stopped]';
+          lastMsg.role = 'agent';
+          chatMessages = [...chatMessages];
+        }
+      } else {
+        status = 'Error: ' + err.message;
+        addMessage('Connection error — is the server running on port 2828?', 'agent');
+      }
+    } finally {
+      isGenerating = false;
+      currentController = null;
+    }
   }
 </script>
 
 <main class="min-h-screen bg-ge-bg text-ge-text flex flex-col md:flex-row h-screen overflow-hidden">
 
-  <div class="w-full md:w-1/3 p-6 flex flex-col gap-6 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0">
-    <div class="space-y-2">
+  <div class="w-full md:w-1/3 p-6 flex flex-col gap-4 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-hidden">
+    <div class="space-y-2 flex-shrink-0">
       <div class="flex items-center gap-2">
         <h1 class="text-3xl font-bold tracking-tight text-ge-accent font-raleway">Zlides V2</h1>
         {#if isBatchMode}
@@ -130,12 +365,59 @@
       <p class="text-ge-text-muted text-sm">Drop vibes. Get slides. The smart parser extracts layout + style from uploaded files.</p>
     </div>
 
-    <div class="flex-grow flex flex-col gap-4">
-      <div class="flex-grow flex flex-col bg-ge-bg rounded-lg p-2 border border-ge-border relative neumorphic-inset">
+    <!-- UI Controls -->
+    <div class="flex flex-col gap-2 flex-shrink-0 text-sm">
+      <div class="flex gap-2 flex-wrap">
+        {#each ["slides", "poster", "worksheet", "report", "rr"] as fmt}
+          <button
+            class="px-3 py-1 rounded-full border border-ge-border transition-colors {selectedFormat === fmt ? 'bg-ge-accent text-ge-bg font-bold border-ge-accent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
+            on:click={() => selectedFormat = fmt}
+          >
+            {fmt}
+          </button>
+        {/each}
+      </div>
+
+      <div class="flex gap-2 flex-wrap mt-2">
+        {#each availableStyles as style}
+          <button
+            class="px-3 py-1 rounded-full border border-ge-border transition-colors text-xs {selectedStyle === style.id ? 'bg-ge-accent text-ge-bg font-bold border-ge-accent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
+            on:click={() => selectedStyle = style.id}
+          >
+            {style.name}
+          </button>
+        {/each}
+      </div>
+
+      <div class="flex gap-2 mt-2">
+        <input type="number" bind:value={pageCount} min="1" max="20" class="bg-ge-bg border border-ge-border rounded px-2 py-1 w-20 text-ge-text outline-none" title="Page Count">
+        <select bind:value={slideLayout} class="bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text flex-grow outline-none">
+          <option value="">Layout: Auto</option>
+          <option value="title-content">Title+Content</option>
+          <option value="two-column">Two Column</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Chat History -->
+    <div id="chat-history" class="flex-grow overflow-y-auto flex flex-col gap-2 p-2 bg-ge-bg rounded-lg border border-ge-border relative neumorphic-inset text-sm">
+      {#each chatMessages as msg}
+        <div class="p-2 rounded max-w-[90%] whitespace-pre-wrap {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border' : 'bg-transparent text-ge-text-muted mr-auto'}">
+          {#if msg.role !== 'user'}
+            <div class="text-xs font-bold mb-1 {msg.role === 'thinking' ? 'text-ge-accent/70' : 'text-ge-accent'}">{msg.role === 'thinking' ? 'Thinking...' : 'Z.AI Agent'}</div>
+          {/if}
+          {msg.text}
+        </div>
+      {/each}
+    </div>
+
+    <div class="flex flex-col gap-2 flex-shrink-0">
+      <div class="flex flex-col bg-ge-bg rounded-lg p-2 border border-ge-border relative neumorphic-inset h-24">
         <textarea
           bind:value={promptText}
-          placeholder="Describe your vibe... (e.g. 'Turn this uploaded PDF into slides. Match the style.')"
-          class="w-full h-full bg-transparent border-none outline-none resize-none p-2 text-ge-text placeholder:text-ge-text-muted/50"
+          on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } }}
+          placeholder="Describe your vibe... (e.g. 'Turn this uploaded PDF into slides.')"
+          class="w-full h-full bg-transparent border-none outline-none resize-none p-1 text-ge-text placeholder:text-ge-text-muted/50 text-sm"
         ></textarea>
 
         <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center bg-ge-bg/80 backdrop-blur rounded p-1">
@@ -171,12 +453,20 @@
       </div>
 
       <div class="flex gap-2">
-        <button
-          on:click={generate}
-          disabled={isGenerating || isUploading}
-          class="flex-grow bg-ge-accent text-ge-bg font-bold py-3 rounded-lg hover:bg-ge-accent-hover transition-colors shadow-lg hover:shadow-ge-accent/20 disabled:opacity-50 disabled:cursor-not-allowed">
-          {isGenerating ? (isBatchMode ? 'Batching...' : 'Generating...') : (isBatchMode ? 'Schedule Batch' : 'Generate')}
-        </button>
+        {#if isGenerating && !isBatchMode}
+          <button
+            on:click={stopRequest}
+            class="flex-grow bg-ge-danger text-ge-bg font-bold py-3 rounded-lg hover:bg-ge-danger/80 transition-colors shadow-lg">
+            Stop
+          </button>
+        {:else}
+          <button
+            on:click={generate}
+            disabled={isGenerating || isUploading}
+            class="flex-grow bg-ge-accent text-ge-bg font-bold py-3 rounded-lg hover:bg-ge-accent-hover transition-colors shadow-lg hover:shadow-ge-accent/20 disabled:opacity-50 disabled:cursor-not-allowed">
+            {isGenerating ? (isBatchMode ? 'Batching...' : 'Generating...') : (isBatchMode ? 'Schedule Batch' : 'Generate')}
+          </button>
+        {/if}
       </div>
       <div class="text-center text-xs text-ge-text-muted font-mono h-4 truncate">{status}</div>
     </div>
@@ -186,26 +476,44 @@
     <div class="h-12 border-b border-ge-border flex justify-between items-center px-4 bg-ge-card/50">
       <div class="text-sm font-raleway font-bold">Preview Stage (RR Enabled)</div>
       <div class="flex gap-2">
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors">Export PDF</button>
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors">Export HTML</button>
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => window.print()}>Export PDF</button>
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => {
+          if (!slides.length) return;
+          const html = slides[currentSlideIndex].html;
+          const blob = new Blob([html], { type: 'text/html' });
+          const link = document.createElement('a');
+          link.download = `slide_${currentSlideIndex + 1}.html`;
+          link.href = URL.createObjectURL(blob);
+          link.click();
+          URL.revokeObjectURL(link.href);
+        }}>Export HTML</button>
       </div>
     </div>
 
     <div class="flex-grow p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
       <div class="w-full h-full max-w-5xl bg-white rounded shadow-2xl border border-ge-border overflow-hidden relative neumorphic" style="aspect-ratio: 16/9;">
         <iframe
+          bind:this={iframeElement}
           title="Slide Preview"
           srcdoc={iframeSrcDoc}
           class="w-full h-full bg-white"
-          sandbox="allow-scripts allow-same-origin allow-popups"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         ></iframe>
       </div>
     </div>
 
     <div class="h-14 border-t border-ge-border flex items-center justify-center gap-4 bg-ge-card/50">
-      <button class="px-4 py-1.5 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50">Prev</button>
+      <button
+        class="px-4 py-1.5 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50"
+        disabled={slides.length === 0 || currentSlideIndex <= 0}
+        on:click={() => { if (currentSlideIndex > 0) { currentSlideIndex--; iframeSrcDoc = slides[currentSlideIndex].html; } }}
+      >Prev</button>
       <span class="text-sm font-mono text-ge-text-muted">Slide {slides.length ? currentSlideIndex + 1 : 0} of {slides.length}</span>
-      <button class="px-4 py-1.5 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50">Next</button>
+      <button
+        class="px-4 py-1.5 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50"
+        disabled={slides.length === 0 || currentSlideIndex >= slides.length - 1}
+        on:click={() => { if (currentSlideIndex < slides.length - 1) { currentSlideIndex++; iframeSrcDoc = slides[currentSlideIndex].html; } }}
+      >Next</button>
     </div>
   </div>
 
