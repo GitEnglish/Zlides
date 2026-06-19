@@ -31,3 +31,6 @@ saved_slides/
 # Test cache
 .pytest_cache/
 .ruff_cache/
+
+node_modules
+frontend_svelte/node_modules

@@ -1,5 +1,16 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import SvelteMarkdown from '@humanspeak/svelte-markdown';
+  import { markedMermaid, MermaidRenderer } from '@humanspeak/svelte-markdown/extensions';
+  import type { StreamingChunk, RendererComponent, Renderers } from '@humanspeak/svelte-markdown';
+
+  interface MermaidRenderers extends Renderers {
+      mermaid: RendererComponent;
+  }
+
+  const renderers: Partial<MermaidRenderers> = {
+      mermaid: MermaidRenderer
+  };
 
   let cost = 0.00;
   let isGenerating = false;
@@ -406,7 +417,13 @@
           {#if msg.role !== 'user'}
             <div class="text-xs font-bold mb-1 {msg.role === 'thinking' ? 'text-ge-accent/70' : 'text-ge-accent'}">{msg.role === 'thinking' ? 'Thinking...' : 'Z.AI Agent'}</div>
           {/if}
-          {msg.text}
+          {#if msg.role === 'agent' || msg.role === 'thinking'}
+            <div class="prose prose-invert prose-sm max-w-none">
+              <SvelteMarkdown source={msg.text} extensions={[markedMermaid()]} {renderers} />
+            </div>
+          {:else}
+            {msg.text}
+          {/if}
         </div>
       {/each}
     </div>
