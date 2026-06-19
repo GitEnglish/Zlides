@@ -86,12 +86,12 @@ def generate_chart_with_code_interpreter(data_description: str) -> str:
     """
     Use GLM's chat completions API with function calling to generate
     a chart. The model will write and execute Python code.
-    
+
     Note: GLM-4 'All Tools' mode handles this automatically in the
     chat UI, but via API you need to implement the tool execution
     yourself.
     """
-    
+
     # Prompt asking the model to generate a chart
     response = requests.post(
         "https://open.bigmodel.cn/api/paas/v4/chat/completions",
@@ -116,10 +116,10 @@ Requirements:
             "max_tokens": 4096
         }
     )
-    
+
     result = response.json()
     code_output = result["choices"][0]["message"]["content"]
-    
+
     # Extract Python code from the response (it's typically wrapped in ```python blocks)
     import re
     code_match = re.search(r'```python\n(.*?)\n```', code_output, re.DOTALL)
@@ -127,11 +127,11 @@ Requirements:
         python_code = code_match.group(1)
     else:
         python_code = code_output
-    
+
     # Execute the generated code in a sandboxed environment
     # (Use docker, e2b.dev, or a restricted subprocess)
     chart_base64 = execute_sandboxed_code(python_code)
-    
+
     return chart_base64
 
 def execute_sandboxed_code(code: str) -> str:
@@ -141,7 +141,7 @@ def execute_sandboxed_code(code: str) -> str:
     import matplotlib
     matplotlib.use('Agg')  # Non-interactive backend
     import matplotlib.pyplot as plt
-    
+
     # Create restricted globals
     safe_globals = {
         '__builtins__': {
@@ -156,11 +156,11 @@ def execute_sandboxed_code(code: str) -> str:
         'json': json,
         'numpy': __import__('numpy'),
     }
-    
+
     # Capture the base64 output
     output_buffer = io.StringIO()
     sys.stdout = output_buffer
-    
+
     try:
         exec(code, safe_globals)
     except Exception as e:
@@ -168,7 +168,7 @@ def execute_sandboxed_code(code: str) -> str:
     finally:
         sys.stdout = sys.__stdout__
         plt.close('all')
-    
+
     # The code should have saved a base64 string to stdout
     return output_buffer.getvalue().strip()
 ```
@@ -180,7 +180,7 @@ def create_slide_with_chart(topic: str, chart_base64: str, explanation: str) -> 
     """
     Send chart data to the slide agent to create a slide containing it.
     """
-    
+
     prompt = f"""创建一个包含数据图表的教学幻灯片。
 
 主题：{topic}
@@ -194,7 +194,7 @@ data:image/png;base64,{chart_base64[:100]}...
 - 右下角添加"数据来源"标注
 - 整体风格：教育风，蓝色系
 """
-    
+
     response = requests.post(
         "https://open.bigmodel.cn/api/v1/agents",
         headers=HEADERS,
@@ -205,7 +205,7 @@ data:image/png;base64,{chart_base64[:100]}...
         },
         stream=True
     )
-    
+
     # Parse SSE stream... (same as in the main guide)
     return parse_slide_response(response)
 ```
@@ -225,9 +225,9 @@ def generate_chart_e2b(data_query: str, api_key: str) -> dict:
     Use E2B sandbox for secure Python code execution.
     The LLM generates code, E2B executes it safely.
     """
-    
+
     code_interpreter = CodeInterpreter(api_key=api_key)
-    
+
     # First, ask GLM to generate the Python code
     code_response = requests.post(
         "https://open.bigmodel.cn/api/paas/v4/chat/completions",
@@ -243,18 +243,18 @@ def generate_chart_e2b(data_query: str, api_key: str) -> dict:
             ]
         }
     ).json()
-    
+
     generated_code = code_response["choices"][0]["message"]["content"]
-    
+
     # Execute in E2B sandbox
     execution = code_interpreter.notebook.exec_cell(generated_code)
-    
+
     # Read the generated chart file from sandbox
     chart_file = code_interpreter.files.read("/home/user/chart.png")
     chart_base64 = base64.b64encode(chart_file).decode('utf-8')
-    
+
     code_interpreter.close()
-    
+
     return {
         "chart_base64": chart_base64,
         "stdout": execution.logs.stdout,

@@ -1,0 +1,22 @@
+--- slide_server.py
++++ slide_server.py
+@@ -37,8 +37,8 @@
+     allow_headers=["*"],
+ )
+
+-
+-# ── Formats & Styles ─────────────────────────────────────────────────────────
++# Mount the new Svelte compiled frontend
++app.mount("/assets", StaticFiles(directory="frontend_svelte/dist/assets"), name="assets")
+
+ FORMATS = {
+     "slides": "Create a multi-slide HTML presentation. Use <section> tags for each slide with page-break-after CSS. Include a title slide, content slides, and a closing slide as appropriate.",
+@@ -481,7 +481,7 @@
+
+ @app.get("/", response_class=FileResponse)
+ async def serve_index():
+-    return FileResponse("index.html")
++    return FileResponse("frontend_svelte/dist/index.html")
+
+
+ @app.get("/health")

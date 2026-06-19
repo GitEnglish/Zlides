@@ -11,19 +11,17 @@
         const prevBtn = document.getElementById('prev-btn');
         const nextBtn = document.getElementById('next-btn');
         const slideCounter = document.getElementById('slide-counter');
-        
+
         const backendURL = '/command';
         const uploadURL = '/upload';
         const stylesURL = '/styles';
-        
+
         let currentSlides = [];
         let currentSlideIdx = 0;
         let currentController = null;
         let selectedFormat = 'slides';
         let selectedStyle = 'auto';
         let availableStyles = [];
-        let totalTokens = 0;
-        let heartbeatTimer = null;
 
         // ── Toast ──────────────────────────────────────────────────────────
         function showToast(msg, duration = 2000) {
@@ -77,11 +75,11 @@
         function updateSlideNav() {
             prevBtn.disabled = currentSlideIdx <= 0;
             nextBtn.disabled = currentSlideIdx >= currentSlides.length - 1;
-            slideCounter.textContent = currentSlides.length > 0 
-                ? `${currentSlideIdx + 1} / ${currentSlides.length}` 
+            slideCounter.textContent = currentSlides.length > 0
+                ? `${currentSlideIdx + 1} / ${currentSlides.length}`
                 : 'No slides';
-            slideInfo.textContent = currentSlides.length > 0 
-                ? `Slide ${currentSlideIdx + 1} of ${currentSlides.length}` 
+            slideInfo.textContent = currentSlides.length > 0
+                ? `Slide ${currentSlideIdx + 1} of ${currentSlides.length}`
                 : 'No slides';
         }
 
@@ -115,7 +113,6 @@
 
             genBtn.disabled = true;
             stopBtn.disabled = false;
-            totalTokens = 0;
 
             addMessage(`[${selectedFormat} / ${selectedStyle}] ${text}`, 'user');
             promptBox.value = '';
@@ -130,13 +127,12 @@
             currentController = new AbortController();
             let liveHtmlChunks = [];
             let thinkingBuffer = '';
-            let finishReason = null;
 
             try {
                 const response = await fetch(backendURL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         message: text,
                         format: selectedFormat,
                         style: selectedStyle,
@@ -147,27 +143,27 @@
                 });
 
                 if (!response.ok) throw new Error("Server error: " + response.status);
-                
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                
+
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-                    
+
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
                     buffer = lines.pop();
-                    
+
                     for (const line of lines) {
                         if (line.startsWith('data:')) {
                             const dataStr = line.substring(5).trim();
                             if (!dataStr || dataStr === '[DONE]') continue;
-                            
+
                             try {
                                 const data = JSON.parse(dataStr);
-                                
+
                                 if (data.type === 'thinking') {
                                     thinkingBuffer += data.text;
                                     if (thinkingBuffer.length > 20) {
@@ -177,25 +173,6 @@
                                     }
                                 }
 
-                                if (data.type === 'usage' && data.usage) {
-                                    totalTokens = data.usage.total_tokens || totalTokens;
-                                    updateStatus();
-                                }
-
-                                if (data.type === 'finish' && data.finish_reason) {
-                                    finishReason = data.finish_reason;
-                                    if (data.finish_reason === 'sensitive') {
-                                        showToast('Content safety triggered — partial output shown', 4000);
-                                    }
-                                }
-
-                                if (data.type === 'tool_label' && data.tag_en) {
-                                    const tagDiv = document.createElement('div');
-                                    tagDiv.className = 'tool-tag';
-                                    tagDiv.innerHTML = `<span class="tag-icon"></span>${data.tag_en}`;
-                                    thinkingDiv.appendChild(tagDiv);
-                                }
-                                
                                 if (data.type === 'answer') {
                                     if (thinkingBuffer) {
                                         thinkingDiv.textContent += thinkingBuffer;
@@ -211,7 +188,7 @@
                                     answerDiv.textContent += data.text;
                                     historyDiv.scrollTop = historyDiv.scrollHeight;
                                 }
-                                
+
                                 if (data.type === 'slide_page') {
                                     if (thinkingBuffer) {
                                         thinkingDiv.textContent += thinkingBuffer;
@@ -219,6 +196,39 @@
                                         thinkingBuffer = '';
                                     }
                                     liveHtmlChunks.push(data.html || '');
+                                    renderLiveHtmlChunks();
+                                }
+
+                                if (data.type === 'slide_remove') {
+                                    console.log("Removing slides at positions:", data.positions);
+                                }
+
+                                if (data.type === 'slide_replace') {
+                                    if (thinkingBuffer) {
+                                        thinkingDiv.textContent += thinkingBuffer;
+                                        historyDiv.scrollTop = historyDiv.scrollHeight;
+                                        thinkingBuffer = '';
+                                    }
+                                    const pos = data.position ? data.position[0] : 0;
+                                    console.log("Replacing slide at position:", pos);
+
+                                    // For modify_page, the position gives us [page_num, fragment_num]
+                                    // But liveHtmlChunks is a flat array of fine-grained chunks.
+                                    // Without perfect mapping, appending might cause duplication if the old chunks are not removed.
+                                    // A robust way to handle 'modify_page' is to clear liveHtmlChunks and re-render everything using the server's updated combined state,
+                                    // but we don't have the full state here. For now, we'll append and rely on the final_html event to correct the state.
+                                    liveHtmlChunks.push(data.html || '');
+                                    renderLiveHtmlChunks();
+                                }
+
+                                if (data.type === 'slide_navigate') {
+                                    if (data.position && data.position.length > 0) {
+                                        currentSlideIdx = Math.max(0, data.position[0] - 1);
+                                        updateSlideNav();
+                                    }
+                                }
+
+                                function renderLiveHtmlChunks() {
                                     const combined = liveHtmlChunks.join('')
                                         .replace(/\\n/g, '\n').replace(/\\"/g, '"');
                                     try {
@@ -235,7 +245,7 @@
                                     }
                                     statusDiv.textContent = `Streaming... (${liveHtmlChunks.length} chunks)`;
                                 }
-                                
+
                                 if (data.type === 'final_html') {
                                     if (thinkingBuffer) {
                                         thinkingDiv.textContent += thinkingBuffer;
@@ -247,16 +257,13 @@
                                     currentSlides.push({ html, title: text });
                                     currentSlideIdx = currentSlides.length - 1;
                                     updateSlideNav();
-
-                                    const badgeClass = finishReason === 'sensitive' ? 'sensitive' : 'stop';
-                                    const badgeText = finishReason === 'sensitive' ? 'Partial' : 'Complete';
-                                    thinkingDiv.innerHTML = `<span class="finish-badge ${badgeClass}">${badgeText}</span> — ${selectedFormat} / ${selectedStyle}`;
+                                    statusDiv.textContent = 'Done!';
+                                    thinkingDiv.textContent = `[Complete — ${selectedFormat} / ${selectedStyle}]`;
                                     thinkingDiv.className = 'msg agent';
 
                                     genBtn.disabled = false;
                                     stopBtn.disabled = true;
                                     currentController = null;
-                                    startHeartbeat();
                                     return;
                                 }
                                 if (data.type === 'error') {
@@ -273,7 +280,7 @@
                         }
                     }
                 }
-                
+
                 statusDiv.textContent = 'Done';
             } catch (err) {
                 if (err.name === 'AbortError') {
@@ -298,26 +305,14 @@
             }
         }
 
-        function updateStatus() {
-            const tokenInfo = totalTokens > 0 ? `<span>${totalTokens.toLocaleString()} tokens</span>` : '';
-            statusDiv.innerHTML = `<span>${statusDiv.textContent.split('·')[0].trim()}</span>${tokenInfo ? ' · ' + tokenInfo : ''}`;
-        }
-
-        function startHeartbeat() {
-            if (heartbeatTimer) clearInterval(heartbeatTimer);
-            heartbeatTimer = setInterval(() => {
-                fetch('/health').catch(() => {});
-            }, 60000);
-        }
-
         // ── Upload ─────────────────────────────────────────────────────────
         async function uploadFile() {
             const fileInput = document.getElementById('file-input');
             if (!fileInput.files.length) return;
-            
+
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-            
+
             statusDiv.textContent = 'Uploading...';
             try {
                 const response = await fetch(uploadURL, { method: 'POST', body: formData });
@@ -509,12 +504,12 @@
             .then(r => r.json())
             .then(data => {
                 if (data.version && data.git_commit) {
-                    document.getElementById('version-info').textContent = 
+                    document.getElementById('version-info').textContent =
                         `v${data.version} (${data.git_commit})`;
                 }
             })
             .catch(() => {});
-        
+
         loadStyles();
 
         slideFrame.srcdoc = '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;background:#f5f5f5;color:#999;font-family:sans-serif;"><div style="text-align:center"><h3>Slide Preview</h3><p style="margin-top:8px;font-size:13px;">Pick format + style, describe what you want, hit Generate</p></div></body></html>';

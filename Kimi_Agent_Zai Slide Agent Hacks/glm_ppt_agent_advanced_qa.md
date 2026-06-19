@@ -112,7 +112,7 @@ class SlideWorkflowManager:
     Build workflow snapshots on top of the slide agent's
     conversation history API.
     """
-    
+
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://open.bigmodel.cn/api/v1"
@@ -120,7 +120,7 @@ class SlideWorkflowManager:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    
+
     def capture_workflow_snapshot(self, conversation_id: str) -> dict:
         """
         Capture the full state of a presentation as a 'workflow snapshot'.
@@ -138,9 +138,9 @@ class SlideWorkflowManager:
                 }
             }
         )
-        
+
         history = response.json()
-        
+
         # Extract workflow metadata
         snapshot = {
             "conversation_id": conversation_id,
@@ -148,14 +148,14 @@ class SlideWorkflowManager:
             "slides": [],
             "edits": []  # Chronological edit log
         }
-        
+
         for choice in history.get("choices", []):
             for msg in choice.get("message", []):
                 for content in msg.get("content", []):
                     if content.get("type") == "object":
                         obj = content.get("object", {})
                         tool_name = obj.get("tool_name")
-                        
+
                         if tool_name == "insert_page":
                             snapshot["slides"].append({
                                 "position": obj.get("position"),
@@ -167,29 +167,29 @@ class SlideWorkflowManager:
                                 "position": obj.get("position"),
                                 "description": obj.get("input", "")
                             })
-                        
+
                         elif tool_name == "remove_slides":
                             snapshot["edits"].append({
                                 "type": "remove",
                                 "positions": obj.get("position", [])
                             })
-                        
+
                         elif tool_name == "modify_page":
                             snapshot["edits"].append({
                                 "type": "modify",
                                 "position": obj.get("position"),
                                 "changes": obj.get("input", "")
                             })
-        
+
         return snapshot
-    
+
     def preview_at_edit(self, conversation_id: str, edit_index: int) -> str:
         """
         'Preview' the presentation as it existed after a specific edit.
         Reconstructs HTML by replaying edits up to that point.
         """
         snapshot = self.capture_workflow_snapshot(conversation_id)
-        
+
         # Replay edits up to the specified index
         current_slides = {}
         for edit in snapshot["edits"][:edit_index + 1]:
@@ -198,11 +198,11 @@ class SlideWorkflowManager:
                     # Fetch the HTML for this slide
                     slide_html = self._get_slide_html(conversation_id, pos)
                     current_slides[pos] = slide_html
-            
+
             elif edit["type"] == "remove":
                 for pos in edit.get("positions", []):
                     current_slides.pop(pos, None)
-        
+
         # Assemble preview HTML
         return self._assemble_html(current_slides)
 ```
@@ -292,7 +292,7 @@ function addAnnotation(slideIndex, x, y, text, author) {
   marker.textContent = annotations.length + 1;
   marker.style.left = x + 'px';
   marker.style.top = y + 'px';
-  
+
   const popup = document.createElement('div');
   popup.className = 'annotation-popup';
   popup.innerHTML = `
@@ -300,13 +300,13 @@ function addAnnotation(slideIndex, x, y, text, author) {
     <p>${text}</p>
     <small>${new Date().toLocaleString()}</small>
   `;
-  
+
   marker.appendChild(popup);
   marker.onclick = (e) => {
     e.stopPropagation();
     popup.classList.toggle('active');
   };
-  
+
   document.getElementById('annotation-layer').appendChild(marker);
   annotations.push({slideIndex, x, y, text, author});
 }
@@ -395,14 +395,14 @@ class PDFToSlidesPipeline:
     """
     Pipeline: Upload PDF → Parse layout → Feed to slide agent
     """
-    
+
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.headers = {"Authorization": f"Bearer {api_key}"}
-    
+
     def parse_pdf(self, pdf_path: str, tier: str = "prime") -> dict:
         """Parse a PDF and return structured content with layout."""
-        
+
         # Step 1: Create parsing task
         with open(pdf_path, 'rb') as f:
             response = requests.post(
@@ -414,44 +414,44 @@ class PDFToSlidesPipeline:
                     "file_type": "PDF"
                 }
             )
-        
+
         task_id = response.json()["task_id"]
-        
+
         # Step 2: Poll for results (async task)
         while True:
             result = requests.get(
                 f"https://open.bigmodel.cn/api/paas/v4/files/parser/result/{task_id}/download_link",
                 headers=self.headers
             ).json()
-            
+
             if result.get("status") == "completed":
                 break
             time.sleep(2)
-        
+
         # Step 3: Download parsed content
         markdown_url = result["markdown_url"]      # Markdown output
         layout_url = result["layout_json_url"]     # Layout bounding boxes
         images_url = result["images_url"]          # Page screenshots
-        
+
         markdown = requests.get(markdown_url).text
         layout = requests.get(layout_url).json()
-        
+
         return {
             "markdown": markdown,
             "layout": layout,
             "page_count": len(layout.get("pages", []))
         }
-    
+
     def generate_slides_from_pdf(self, pdf_path: str, prompt_template: str = None) -> dict:
         """
         Full pipeline: Parse PDF → Extract content → Generate slides
         """
         # Parse the PDF
         parsed = self.parse_pdf(pdf_path, tier="prime")
-        
+
         # Build prompt from parsed content
         content_summary = parsed["markdown"][:8000]  # Truncate for token limits
-        
+
         slide_prompt = prompt_template or f"""基于以下文档内容，制作一份教学课件PPT：
 
 文档内容：
@@ -463,7 +463,7 @@ class PDFToSlidesPipeline:
 - 为每页添加思考题
 - 风格：教育风，适合课堂投影
 """
-        
+
         # Send to slide agent
         response = requests.post(
             "https://open.bigmodel.cn/api/v1/agents",
@@ -475,7 +475,7 @@ class PDFToSlidesPipeline:
             },
             stream=True
         )
-        
+
         return {"stream": response, "parsed_content": parsed}
 ```
 

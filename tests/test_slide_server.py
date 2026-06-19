@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import pytest
 import os
 from fastapi.testclient import TestClient
@@ -29,6 +30,7 @@ def test_upload_no_file(client):
     assert response.status_code == 422
 
 
+@patch("slide_server.Z_AI_API_KEY", "mock_key")
 def test_upload_invalid_file_type(client):
     fake_file = ("test.exe", b"test content", "application/octet-stream")
     response = client.post("/upload", files={"file": fake_file}, data={"type": "file"})

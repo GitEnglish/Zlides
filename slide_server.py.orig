@@ -1,5 +1,5 @@
 import httpx
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -26,20 +26,6 @@ ASSETS_DIR = Path("assets")
 os.makedirs(SAVED_SLIDES_DIR, exist_ok=True)
 os.makedirs(STYLE_BANK_DIR, exist_ok=True)
 
-
-def estimate_cost(input_tokens: int, output_tokens: int, model: str = "glm-4.5") -> float:
-    # Estimate cost in USD
-    rates_rmb = {
-        "glm-4.5": {"in": 0.8, "out": 2.0},
-        "glm-4.5-air": {"in": 0.35, "out": 0.5},
-        "glm-4.6": {"in": 1.0, "out": 2.0},
-        "glm-4.7": {"in": 0.5, "out": 1.0},
-    }
-    rate = rates_rmb.get(model, rates_rmb["glm-4.5"])
-    cost_rmb = (input_tokens / 1_000_000) * rate["in"] + (output_tokens / 1_000_000) * rate["out"]
-    cost_usd = cost_rmb * 2.5 * 0.14 # 2.5x agent overhead
-    return round(cost_usd, 4)
-
 app = FastAPI(title="Zlides API", version=VERSION)
 app.add_middleware(
     CORSMiddleware,
@@ -49,71 +35,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount the new Svelte compiled frontend
-app.mount("/assets", StaticFiles(directory="public/assets"), name="assets")
+
+# ── Formats & Styles ─────────────────────────────────────────────────────────
 
 FORMATS = {
     "slides": "Create a multi-slide HTML presentation. Use <section> tags for each slide with page-break-after CSS. Include a title slide, content slides, and a closing slide as appropriate.",
     "poster": "Create a single-page HTML poster. Everything visible on one screen/page. Eye-catching, visual, information-dense.",
     "worksheet": "Create an HTML worksheet with exercises, fill-in-the-blank, matching, or short answer sections. Include numbered exercises with clear instructions. Use HTML form elements (input, checkbox) for interactive fields but NO <script> tags — any interactivity must be CSS-only.",
     "report": "Create an HTML document/report. Structured with headings, paragraphs, lists, and tables as needed. Professional document layout suitable for printing.",
-    "rr": "Create an HTML learning resource. Where content can be regenerated (exercises, example sentences, vocabulary lists, practice questions), place <button id='regenerate' data-prompt='SPECIFIC regeneration instruction here'> with a clear label. Do NOT put regenerate buttons on static content like instructions or explanations — only where it makes pedagogical sense to generate new variants. Add inline styles for .regenerate-btn.",
+    "rr": "Create an HTML learning resource. Where content can be regenerated (exercises, example sentences, vocabulary lists, practice questions), place <button id='regenerate' data-prompt='SPECIFIC regeneration instruction here'> with a clear label. Do NOT put regenerate buttons on static content like instructions or explanations — only where it makes pedagogical sense to generate new variants.",
 }
 
-
-
-
-import asyncio
-
-class BatchSlideGenerator:
-    """Headless batch slide generation for multiple topics/prompts."""
-    def __init__(self, api_key: str, max_concurrent: int = 3):
-        self.api_key = api_key
-        self.max_concurrent = max_concurrent
-        self.semaphore = asyncio.Semaphore(max_concurrent)
-
-    async def _generate_one(self, payload: dict) -> dict:
-        async with self.semaphore:
-            # Fake async processing for the batch queue, we would hook this to Z.AI API
-            # For this exercise, we simulate the 50m wait times / timeout prevention
-            await asyncio.sleep(2)
-            return {"status": "completed", "prompt": payload.get("prompt")}
-
-    async def generate_topic_batch(self, topics: list[dict]) -> list[dict]:
-        tasks = [
-            self._generate_one(topic)
-            for topic in topics
-        ]
-        return await asyncio.gather(*tasks, return_exceptions=True)
-
-batch_generator = BatchSlideGenerator(api_key=Z_AI_API_KEY)
-
-class BatchRequest(BaseModel):
-    prompts: list[str]
-
-@app.post("/batch")
-async def process_batch(req: BatchRequest):
-    """Queue multiple generation requests"""
-    topics = [{"prompt": p} for p in req.prompts]
-    results = await batch_generator.generate_topic_batch(topics)
-    return {"results": results, "status": "batch_completed"}
-
-class CostEstimateRequest(BaseModel):
-    prompt: str
-    files_attached: int = 0
-
-@app.post("/estimate-cost")
-async def api_estimate_cost(req: CostEstimateRequest):
-    # Rough token estimation: 1 word ~ 1.5 tokens
-    # Average output for a slide deck is ~8000 tokens
-    estimated_input_tokens = len(req.prompt.split()) * 1.5
-    if req.files_attached > 0:
-        estimated_input_tokens += req.files_attached * 3000 # Assume ~3k tokens per file
-
-    estimated_output_tokens = 8000
-
-    cost_usd = estimate_cost(estimated_input_tokens, estimated_output_tokens)
-    return {"cost_usd": cost_usd, "input_tokens": estimated_input_tokens, "output_tokens": estimated_output_tokens}
 
 def load_style_bank():
     """Load all style packs from style_bank/ directory."""
@@ -143,12 +75,6 @@ def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
             base += (
                 f"\n\nStyle: {style.get('prompt_hint', style.get('name', style_id))}"
             )
-            css = style.get('css', {})
-            if css:
-                base += "\n\nCRITICAL COLOR PALETTE INSTRUCTIONS:\n"
-                base += "You must explicitly use these exact hex colors in your inline CSS styling:\n"
-                for k, v in css.items():
-                    base += f"- {k}: {v}\n"
 
     return base
 
@@ -417,7 +343,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return FileResponse("public/index.html")
+    return FileResponse("index.html")
 
 
 @app.get("/health")
@@ -573,7 +499,7 @@ async def send_command(request: ChatRequest):
     # Page count instruction
     page_instruction = ""
     effective_page_count = request.page_count or 5
-    page_instruction = f"\nCRITICAL: MUST create exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
+    page_instruction = f"\nCreate exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
     if request.layout:
         page_instruction += f" Layout preference: {request.layout}."
 
@@ -634,9 +560,11 @@ async def send_command(request: ChatRequest):
     payload["response_format"] = {"type": "json_object"}
     payload["requestId"] = str(uuid.uuid4())
 
-    # Always continue conversation if we have an ID
-    if conversation_id:
+    # Continue conversation on edit requests
+    if is_edit_request:
         payload["conversation_id"] = conversation_id
+    else:
+        session_store["conversation_id"] = None
 
     # Inject any queued style image
     style_image_id = session_store.pop("pending_style_image", None)
@@ -870,28 +798,17 @@ async def send_command(request: ChatRequest):
                                 request.message,
                             )
 
-                    # Always save conversation_id for future requests
-                    if last_valid_chunk.get("conversation_id"):
+                    # Save conversation_id only for edit requests (continuations)
+                    if is_edit_request and last_valid_chunk.get("conversation_id"):
                         session_store["conversation_id"] = last_valid_chunk[
                             "conversation_id"
                         ]
                         save_session(session_store)
 
-                    # Inject --zlides-* CSS variables into the generated HTML
-                    style_id = request.style or request.theme or "auto"
-                    styles = load_style_bank()
-                    if style_id and style_id != "auto":
-                        sp = styles.get(style_id)
-                        if sp and sp.get("css"):
-                            css_vars = "\n".join([f"      --zlides-{k}: {v};" for k, v in sp["css"].items()])
-                            css_injection = f"\n<style>\n:root {{\n{css_vars}\n}}\n</style>\n"
-                            if "</head>" in slide_html:
-                                slide_html = slide_html.replace("</head>", f"{css_injection}</head>")
-                            else:
-                                slide_html = f"{css_injection}\n" + slide_html
-
                     # Append print CSS from style bank if applicable
+                    style_id = request.style or request.theme or "auto"
                     if style_id and style_id != "auto":
+                        styles = load_style_bank()
                         sp = styles.get(style_id)
                         if sp and sp.get("print_css"):
                             print_css = sp["print_css"]
@@ -950,17 +867,14 @@ async def async_generate(request: ChatRequest):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/export")
-async def export_conversation(request: dict):
+@app.post("/export/pdf")
+async def export_pdf(request: dict):
     if not Z_AI_API_KEY:
         raise HTTPException(status_code=401, detail="Z_AI_API_KEY not configured")
 
     conversation_id = request.get("conversation_id")
     if not conversation_id:
         raise HTTPException(status_code=400, detail="conversation_id required")
-
-    include_pdf = request.get("include_pdf", True)
-    include_html = request.get("include_html", False)
 
     token = generate_token(Z_AI_API_KEY, exp_seconds=3600)
     headers = {
@@ -974,8 +888,7 @@ async def export_conversation(request: dict):
         "agent_id": "slides_glm_agent",
         "conversation_id": conversation_id,
         "custom_variables": {
-            "include_pdf": include_pdf,
-            "include_html": include_html
+            "include_pdf": True
         }
     }
 
@@ -986,6 +899,8 @@ async def export_conversation(request: dict):
                 raise HTTPException(status_code=response.status_code, detail=response.text)
 
             data = response.json()
+            # In a real app we'd parse the PDF link from data, but we'll return the whole data block
+            # or try to extract it depending on Z.AI's response format
             return {"status": "success", "data": data}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -1027,58 +942,43 @@ async def get_conversation_history(conversation_id: str):
 
 # ── Upload ────────────────────────────────────────────────────────────────────
 
-
-class FileParserPipeline:
-    """
-    Pipeline: Upload PDF -> Parse layout -> Feed to slide agent or style bank
-    """
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.headers = {"Authorization": f"Bearer {api_key}"}
-
-    def parse_pdf(self, pdf_bytes: bytes, filename: str, tier: str = "prime") -> dict:
-        """Mock for the parsing to return markdown and layout json."""
-        # In a real scenario we use: requests.post("https://open.bigmodel.cn/api/paas/v4/files/parser/create"...)
-        # and poll for "status": "completed". We return simulated data here to prevent hitting actual endpoints while testing.
-        return {
-                        "markdown": "# Parsed Content from " + filename + "\n\nHere is extracted text with layout hierarchy preserved.",
-            "layout": {"pages": [1]},
-            "page_count": 1
-        }
-
-file_parser = FileParserPipeline(api_key=Z_AI_API_KEY)
-
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...), type: str = Form("file")):
-    """Enhanced upload endpoint to handle prime parsing and style extraction."""
+async def upload_file(file: UploadFile = File(...), upload_type: str = "file"):
+    if not Z_AI_API_KEY:
+        raise HTTPException(status_code=401, detail="Z_AI_API_KEY not configured")
 
-    ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "png", "jpg", "jpeg", "csv", "txt", "md"}
+    allowed = {"pdf", "doc", "xlsx", "ppt", "txt", "jpg", "jpeg", "png", "gif", "webp"}
     ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="File type not allowed")
-    content = await file.read()
+    if ext not in allowed:
+        raise HTTPException(
+            status_code=400, detail=f"File type not allowed. Allowed: {allowed}"
+        )
 
-    # Run through the GLM file parser (Prime tier for layout JSON)
-    parsed_data = file_parser.parse_pdf(content, file.filename, tier="prime")
+    contents = await file.read()
+    if len(contents) > 100 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File exceeds 100MB limit")
 
-    # Check if we should reverse engineer the style
-    style_extracted = None
-    if "style" in type.lower() or file.filename.endswith(('.png', '.jpg')):
-        style_extracted = {
-            "id": f"extracted_{int(time.time())}",
-            "name": f"Style from {file.filename}",
-            "prompt_hint": "Reverse engineered from image/pdf. Use dark background with clear contrast.",
-            "css": {"bg": "#1a1a1a", "card": "#2d2d2d"}
-        }
-        # Append to style bank
-        with open(STYLE_BANK_DIR / f"{style_extracted['id']}.json", "w") as sf:
-            json.dump(style_extracted, sf)
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            ZAI_FILES_ENDPOINT,
+            files={"file": (file.filename, contents, file.content_type)},
+            data={"purpose": "agent"},
+            headers={
+                "Authorization": f"Bearer {generate_token(Z_AI_API_KEY)}",
+                "Accept-Language": "en-US,en",
+            },
+        )
 
-    return {
-        "status": "success",
-        "parsed_markdown": parsed_data["markdown"],
-        "style_extracted": style_extracted
-    }
+    if response.status_code != 200:
+        raise HTTPException(status_code=500, detail=f"Z.AI API Error: {response.text}")
+
+    result = response.json()
+    if upload_type == "style" and result.get("id"):
+        session_store["pending_style_image"] = result["id"]
+        result["message"] = "Style reference queued for next generation"
+
+    return result
+
 
 @app.post("/style")
 async def ingest_style(request: dict):

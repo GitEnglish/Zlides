@@ -311,7 +311,7 @@ from bs4 import BeautifulSoup
 
 def customize_slide_template(html_content, brand_config):
     soup = BeautifulSoup(html_content, 'html.parser')
-    
+
     # Inject custom CSS variables
     style_tag = soup.find('style')
     if style_tag:
@@ -323,7 +323,7 @@ def customize_slide_template(html_content, brand_config):
         }}
         """
         style_tag.string = custom_css + style_tag.string
-    
+
     # Add interactive elements
     for slide in soup.find_all(class_='slide'):
         # Inject placeholder regeneration markers for students
@@ -332,7 +332,7 @@ def customize_slide_template(html_content, brand_config):
         placeholder['data-regenerate'] = 'true'
         placeholder.string = '[Student Exercise — Click to Regenerate]'
         slide.append(placeholder)
-    
+
     return str(soup)
 ```
 
@@ -349,10 +349,10 @@ Since all styles are inline or in a `<style>` block, you can inject an override 
     height: 720px !important;
     overflow: hidden !important;
   }
-  
+
   /* Brand color injection */
   .slide-title { color: #your-brand-color !important; }
-  
+
   /* Add placeholder styling for student exercises */
   .student-exercise-placeholder {
     border: 2px dashed #e94560;
@@ -489,19 +489,19 @@ For presentations that exceed the ~15 page limit, use the continuation pattern:
 def generate_long_presentation(topic, total_pages=25):
     conversation_id = None
     all_slides = []
-    
+
     # First batch
     response = call_agent(f"制作{topic}的前12页PPT")
     conversation_id = response.conversation_id
     all_slides.extend(response.slides)
-    
+
     # Continue with remaining pages
     response = call_agent(
         "继续生成第13-25页",
         conversation_id=conversation_id
     )
     all_slides.extend(response.slides)
-    
+
     return all_slides
 ```
 
@@ -564,7 +564,7 @@ class GLMPPTAgent:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    
+
     def generate_slides(self, prompt: str, conversation_id: str = None):
         """Generate slides from a text prompt."""
         payload = {
@@ -577,28 +577,28 @@ class GLMPPTAgent:
         }
         if conversation_id:
             payload["conversation_id"] = conversation_id
-        
+
         response = requests.post(
             self.base_url,
             headers=self.headers,
             json=payload,
             stream=True
         )
-        
+
         # Parse SSE stream
         client = sseclient.SSEClient(response)
         slides = []
         current_conversation_id = None
-        
+
         for event in client.events():
             data = json.loads(event.data)
             current_conversation_id = data.get("conversation_id")
-            
+
             for choice in data.get("choices", []):
                 for msg in choice.get("messages", []):
                     phase = msg.get("phase")
                     content = msg.get("content", [])
-                    
+
                     if phase == "tool":
                         for item in content:
                             if item.get("type") == "object":
@@ -610,13 +610,13 @@ class GLMPPTAgent:
                                         "html": slide_html,
                                         "position": position
                                     })
-        
+
         return {
             "conversation_id": current_conversation_id,
             "slides": slides
         }
-    
-    def export_presentation(self, conversation_id: str, 
+
+    def export_presentation(self, conversation_id: str,
                            include_pdf: bool = True,
                            include_html: bool = True):
         """Export presentation to PDF and/or HTML."""
@@ -628,13 +628,13 @@ class GLMPPTAgent:
                 "include_html": include_html
             }
         }
-        
+
         response = requests.post(
             f"{self.base_url}/conversation/",
             headers=self.headers,
             json=payload
         )
-        
+
         return response.json()
 ```
 
@@ -646,7 +646,7 @@ from bs4 import BeautifulSoup
 
 class StudentExerciseInjector:
     """Injects regenerable exercise placeholders into GLM-generated slides."""
-    
+
     EXERCISE_TEMPLATES = {
         "fill_blank": {
             "html": '<div class="exercise fill-blank" data-type="fill_blank">'
@@ -674,14 +674,14 @@ class StudentExerciseInjector:
             ]
         }
     }
-    
+
     def inject_exercises(self, slide_html: str, exercise_types: list = None):
         """Add interactive exercise placeholders to slides."""
         soup = BeautifulSoup(slide_html, 'html.parser')
-        
+
         # Find content areas and append exercises
         content_divs = soup.find_all(class_='slide-content')
-        
+
         for i, div in enumerate(content_divs):
             if exercise_types and i < len(exercise_types):
                 ex_type = exercise_types[i]
@@ -690,7 +690,7 @@ class StudentExerciseInjector:
                     exercise_html = self._render_exercise(template, ex_type)
                     exercise_tag = BeautifulSoup(exercise_html, 'html.parser')
                     div.append(exercise_tag)
-        
+
         # Inject the exercise JavaScript
         script = soup.new_tag('script')
         script.string = '''
@@ -702,7 +702,7 @@ class StudentExerciseInjector:
             // Implement answer checking logic
             feedback.textContent = 'Checking...';
         }
-        
+
         function regenerateExercise(type) {
             // Call GLM API to generate new exercise of specified type
             return fetch('/api/regenerate-exercise', {
@@ -713,9 +713,9 @@ class StudentExerciseInjector:
         '''
         if soup.body:
             soup.body.append(script)
-        
+
         return str(soup)
-    
+
     def _render_exercise(self, template, ex_type):
         if ex_type == "fill_blank":
             prompt = random.choice(template["prompts"])
@@ -726,12 +726,12 @@ class StudentExerciseInjector:
 ### 10.3 Complete Workflow: Generate → Customize → Export
 
 ```python
-async def create_teaching_presentation(topic: str, 
+async def create_teaching_presentation(topic: str,
                                        student_level: str,
                                        exercise_types: list = None):
     """
     Complete workflow: generate slides, inject exercises, export.
-    
+
     Args:
         topic: Subject matter
         student_level: e.g., "高一", "undergraduate"
@@ -739,37 +739,37 @@ async def create_teaching_presentation(topic: str,
     """
     agent = GLMPPTAgent(api_key="your-api-key")
     injector = StudentExerciseInjector()
-    
+
     # Step 1: Generate initial slides
     prompt = f"""作为{student_level}老师，制作关于"{topic}"的教学课件。
     需要包含概念讲解、公式推导、生活案例、课堂练习。
     风格：清新教育风，适合课堂投影。
     输出10-12页。"""
-    
+
     result = agent.generate_slides(prompt)
     conversation_id = result["conversation_id"]
-    
+
     # Step 2: Add interactive elements via follow-up
     agent.generate_slides(
         "在每张内容页底部添加一个练习题区域，"
         "用虚线框标注，标题为\"课堂练习\"。",
         conversation_id=conversation_id
     )
-    
+
     # Step 3: Export HTML
     export = agent.export_presentation(
         conversation_id=conversation_id,
         include_pdf=True,
         include_html=True
     )
-    
+
     # Step 4: Post-process HTML for exercise interactivity
     html_url = extract_html_url(export)
     html_content = download(html_url)
-    
+
     if exercise_types:
         html_content = injector.inject_exercises(html_content, exercise_types)
-    
+
     return {
         "pdf_url": extract_pdf_url(export),
         "html_content": html_content,

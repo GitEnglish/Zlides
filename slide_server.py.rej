@@ -1,0 +1,11 @@
+--- slide_server.py
++++ slide_server.py
+@@ -481,7 +481,7 @@
+
+ @app.get("/", response_class=FileResponse)
+ async def serve_index():
+-    return FileResponse("index.html")
++    return FileResponse("frontend_svelte/dist/index.html")
+
+
+ @app.get("/health")

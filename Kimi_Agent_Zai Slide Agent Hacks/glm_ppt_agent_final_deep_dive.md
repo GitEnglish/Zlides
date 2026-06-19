@@ -74,23 +74,23 @@ class SlideContentPipeline:
     Ingest any content (PDFs, images, docs) and convert to
     slide-ready prompts for the agent.
     """
-    
+
     def ingest_pdf(self, pdf_path: str) -> str:
         """PDF → structured text via File Parser API."""
         # Use Prime tier for layout + markdown
         parsed = self.file_parser.parse(pdf_path, tier="prime")
         return parsed["markdown"]
-    
+
     def ingest_image(self, image_path: str) -> str:
         """Image → description via GLM-4.5V."""
         description = self.vision_model.describe(image_path)
         return description
-    
+
     def ingest_excel(self, excel_path: str) -> str:
         """Excel → data summary via File Parser."""
         parsed = self.file_parser.parse(excel_path, tier="prime")
         return self._summarize_tables(parsed["layout"])
-    
+
     def create_slides_from_content(self, content: str, topic: str) -> dict:
         """Feed processed content to slide agent."""
         prompt = f"""基于以下内容，创建关于"{topic}"的教学课件：
@@ -98,7 +98,7 @@ class SlideContentPipeline:
 {content[:8000]}  # Truncate to fit context
 
 要求：提取核心知识点，添加练习题，教育风格。"""
-        
+
         return self.slide_agent.generate(prompt)
 ```
 
@@ -128,16 +128,16 @@ from datetime import datetime
 
 class BatchSlideGenerator:
     """Headless batch slide generation for multiple topics."""
-    
+
     def __init__(self, api_key: str, max_concurrent: int = 3):
         self.api_key = api_key
         self.max_concurrent = max_concurrent
         self.semaphore = asyncio.Semaphore(max_concurrent)
-    
+
     async def generate_topic_batch(self, topics: list[dict]) -> list[dict]:
         """
         Generate slides for multiple topics concurrently.
-        
+
         topics: [{"title": "", "audience": "", "pages": 10}, ...]
         """
         async with aiohttp.ClientSession() as session:
@@ -146,20 +146,20 @@ class BatchSlideGenerator:
                 for topic in topics
             ]
             return await asyncio.gather(*tasks, return_exceptions=True)
-    
+
     async def _generate_one(self, session: aiohttp.ClientSession, topic: dict) -> dict:
         """Generate slides for a single topic with concurrency limit."""
         async with self.semaphore:
             prompt = f"""作为{topic['audience']}老师，
 制作关于"{topic['title']}"的教学课件。
 输出{topic.get('pages', 10)}页，教育风格。"""
-            
+
             payload = {
                 "agent_id": "slides_glm_agent",
                 "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}],
                 "stream": True
             }
-            
+
             async with session.post(
                 "https://open.bigmodel.cn/api/v1/agents",
                 headers={"Authorization": f"Bearer {self.api_key}"},
@@ -167,7 +167,7 @@ class BatchSlideGenerator:
             ) as response:
                 # Parse SSE stream...
                 slides = await self._parse_sse_stream(response)
-                
+
                 return {
                     "topic": topic["title"],
                     "slides": slides,
@@ -194,23 +194,23 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     timeout-minutes: 60  # Agent can take 30-50 minutes
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
         run: pip install requests
-      
+
       - name: Generate slides
         env:
           GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
         run: python scripts/generate_slides.py "${{ github.event.inputs.topic }}"
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
