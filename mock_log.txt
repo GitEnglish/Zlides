@@ -1,0 +1,4 @@
+  File "/app/mock_backend.py", line 29
+    yield "data: " + json.dumps({"type": "thinking", "text": "1. Analyzing request..."}) + "
+                                                                                           ^
+SyntaxError: unterminated string literal (detected at line 29)
