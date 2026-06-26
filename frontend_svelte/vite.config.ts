@@ -10,4 +10,8 @@ export default defineConfig({
       $lib: '/src/lib',
     },
   },
+  build: {
+    outDir: '../public',
+    emptyOutDir: true,
+  },
 })
