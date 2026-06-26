@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Zlides
+Comment=AI-powered slide creator
+Exec=/home/hayron/MyProjects/ZZZlides/launch.sh
+Icon=/home/hayron/MyProjects/ZZZlides/public/favicon.svg
+Type=Application
+Terminal=true
+Categories=Office;Presentation;

@@ -247,3 +247,16 @@ def test_save_and_delete_style(client):
 def test_delete_nonexistent_style(client):
     resp = client.delete("/styles/nonexistent-xyz")
     assert resp.status_code == 404
+
+
+def test_combine_tool_pages():
+    from slide_server import combine_tool_pages
+    pages = [
+        {"tool": "add_slide", "html": "<div>page3</div>", "position": [3]},
+        {"tool": "insert_page", "html": "<div>page1</div>", "position": [1]},
+        {"tool": "modify_page", "html": "<div>page2</div>", "position": [2]},
+    ]
+    res = combine_tool_pages(pages)
+    assert res == "<div>page1</div><div>page2</div><div>page3</div>"
+
+

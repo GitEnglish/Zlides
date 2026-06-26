@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=ZZZlides
+Comment=AI-powered slide creator
+Exec=bash -c 'cd /home/hayron/MyProjects/ZZZlides && bash launch.sh'
+Icon=/home/hayron/MyProjects/ZZZlides/public/favicon.svg
+Type=Application
+Terminal=true
+Path=/home/hayron/MyProjects/ZZZlides
+Categories=Office;Presentation;
+StartupNotify=true

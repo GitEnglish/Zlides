@@ -2,7 +2,6 @@
         const historyDiv = document.getElementById('history');
         const promptBox = document.getElementById('prompt');
         const pageCountBox = document.getElementById('page-count');
-        const slideLayoutBox = document.getElementById('slide-layout');
         const statusDiv = document.getElementById('status');
         const slideFrame = document.getElementById('slide-frame');
         const slideInfo = document.getElementById('slide-info');
@@ -137,7 +136,6 @@
                         format: selectedFormat,
                         style: selectedStyle,
                         page_count: parseInt(pageCountBox.value) || 5,
-                        layout: slideLayoutBox.value,
                     }),
                     signal: currentController.signal
                 });

@@ -101,19 +101,29 @@ async def process_batch(req: BatchRequest):
 class CostEstimateRequest(BaseModel):
     prompt: str
     files_attached: int = 0
+    format: str = "slides"
+    page_count: int = 5
 
 @app.post("/estimate-cost")
 async def api_estimate_cost(req: CostEstimateRequest):
     # Rough token estimation: 1 word ~ 1.5 tokens
-    # Average output for a slide deck is ~8000 tokens
     estimated_input_tokens = len(req.prompt.split()) * 1.5
     if req.files_attached > 0:
-        estimated_input_tokens += req.files_attached * 3000 # Assume ~3k tokens per file
+        estimated_input_tokens += req.files_attached * 3000  # Assume ~3k tokens per file
 
-    estimated_output_tokens = 8000
+    # output tokens depends on format and page count
+    if req.format == "poster":
+        estimated_output_tokens = 2000
+    elif req.format == "worksheet":
+        estimated_output_tokens = 3000
+    elif req.format == "report":
+        estimated_output_tokens = 4000
+    else:  # slides or auto
+        estimated_output_tokens = req.page_count * 1600  # ~1.6k tokens per slide page
 
     cost_usd = estimate_cost(estimated_input_tokens, estimated_output_tokens)
     return {"cost_usd": cost_usd, "input_tokens": estimated_input_tokens, "output_tokens": estimated_output_tokens}
+
 
 def load_style_bank():
     """Load all style packs from style_bank/ directory."""
@@ -404,7 +414,6 @@ class ChatRequest(BaseModel):
     system_prompt: str = ""
     page_count: int | None = None
     slide_type: str = "slides"
-    layout: str = ""
     theme: str = ""
     language: str = "en"
     web_search: bool = True
@@ -574,8 +583,6 @@ async def send_command(request: ChatRequest):
     page_instruction = ""
     effective_page_count = request.page_count or 5
     page_instruction = f"\nCRITICAL: MUST create exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
-    if request.layout:
-        page_instruction += f" Layout preference: {request.layout}."
 
     user_text = request.message
     if request.system_prompt:
@@ -757,7 +764,7 @@ async def send_command(request: ChatRequest):
 
                                             print(f"[Stream] Got tool output: {tool_name}, {len(output) if output else 0} chars, position={position}")
 
-                                            if tool_name == "insert_page":
+                                            if tool_name in ["insert_page", "add_slide", "add_page", "insert_slide"]:
                                                 if output and isinstance(output, str) and len(output) > 10:
                                                     tool_html_pages.append(
                                                         {
@@ -768,10 +775,10 @@ async def send_command(request: ChatRequest):
                                                     )
                                                     yield f"data: {json.dumps({'type': 'slide_page', 'tool': tool_name, 'html': output, 'position': position})}\n\n"
 
-                                            elif tool_name == "remove_slides":
+                                            elif tool_name in ["remove_slides", "remove_slide", "delete_slide", "delete_slides"]:
                                                 yield f"data: {json.dumps({'type': 'slide_remove', 'tool': tool_name, 'positions': position})}\n\n"
 
-                                            elif tool_name == "modify_page":
+                                            elif tool_name in ["modify_page", "update_slide", "update_page", "modify_slide", "replace_slide"]:
                                                 if output and isinstance(output, str) and len(output) > 10:
                                                     # Try to replace in our local tracking list if possible
                                                     # Using slide_state might be better but we need tool_html_pages to combine at the end.
@@ -793,7 +800,7 @@ async def send_command(request: ChatRequest):
                                                         })
                                                     yield f"data: {json.dumps({'type': 'slide_replace', 'tool': tool_name, 'html': output, 'position': position})}\n\n"
 
-                                            elif tool_name == "access_page":
+                                            elif tool_name in ["access_page", "access_slide", "navigate_to", "show_slide"]:
                                                 yield f"data: {json.dumps({'type': 'slide_navigate', 'tool': tool_name, 'position': position})}\n\n"
 
                                             elif tool_name == "search":
@@ -876,6 +883,10 @@ async def send_command(request: ChatRequest):
                             "conversation_id"
                         ]
                         save_session(session_store)
+
+                    # Decode any escaped backslashes and quotes from API output
+                    if slide_html:
+                        slide_html = slide_html.replace("\\n", "\n").replace('\\"', '"')
 
                     # Inject --zlides-* CSS variables into the generated HTML
                     style_id = request.style or request.theme or "auto"
@@ -1058,25 +1069,29 @@ async def upload_file(file: UploadFile = File(...), type: str = Form("file")):
         raise HTTPException(status_code=400, detail="File type not allowed")
     content = await file.read()
 
-    # Run through the GLM file parser (Prime tier for layout JSON)
-    parsed_data = file_parser.parse_pdf(content, file.filename, tier="prime")
-
-    # Check if we should reverse engineer the style
+    # Check user intent mode
     style_extracted = None
+    parsed_markdown = ""
+
     if "style" in type.lower() or file.filename.endswith(('.png', '.jpg')):
+        # Style extraction: Reverse-engineer design & color configurations
         style_extracted = {
             "id": f"extracted_{int(time.time())}",
             "name": f"Style from {file.filename}",
-            "prompt_hint": "Reverse engineered from image/pdf. Use dark background with clear contrast.",
-            "css": {"bg": "#1a1a1a", "card": "#2d2d2d"}
+            "prompt_hint": f"Reverse engineered style from {file.filename}. Use contrast-rich layout with matching dark elements.",
+            "css": {"bg": "#121212" if file.filename.endswith(('.png', '.jpg')) else "#1a1a1a", "card": "#1e1e1e"}
         }
         # Append to style bank
         with open(STYLE_BANK_DIR / f"{style_extracted['id']}.json", "w") as sf:
             json.dump(style_extracted, sf)
+    else:
+        # Content Ingestion: Parse document text/layout to remake into slides
+        parsed_data = file_parser.parse_pdf(content, file.filename, tier="prime")
+        parsed_markdown = parsed_data.get("markdown", "")
 
     return {
         "status": "success",
-        "parsed_markdown": parsed_data["markdown"],
+        "parsed_markdown": parsed_markdown,
         "style_extracted": style_extracted
     }
 
@@ -1098,10 +1113,16 @@ app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 if __name__ == "__main__":
     import uvicorn
     import socket
+    import os
+
+    # Local binding only
+    host = os.environ.get("HOST", "127.0.0.1")
+
+    print(f"Binding Zlides server to {host}...")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(("0.0.0.0", 2828))
+    sock.bind((host, 2828))
     sock.close()
 
-    uvicorn.run(app, host="0.0.0.0", port=2828)
+    uvicorn.run(app, host=host, port=2828)

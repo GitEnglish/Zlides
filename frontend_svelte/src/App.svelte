@@ -24,11 +24,12 @@
   let slides: any[] = [];
   let currentSlideIndex = 0;
   // Included a mock RR button to prove the concept works when dropped in
-  let iframeSrcDoc = "<html><body style='display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#262424;color:#9e9e9e;font-family:sans-serif;'><h3>Zlides V2 Preview</h3><p>Example RR Student Exercise below:</p><br><button id='regenerate' data-prompt='Give me a new math problem' style='padding:8px 16px;background:#ff6600;color:#fff;border:none;border-radius:4px;cursor:pointer;'>Regenerate Exercise</button><script>document.querySelectorAll('button[id=\"regenerate\"]').forEach(b=>b.addEventListener('click',function(){window.parent.postMessage({type:'regenerate',prompt:this.getAttribute('data-prompt')},'*');this.innerText='Regenerating...';}));<\/script></body></html>";
+  let iframeSrcDoc = "<html><body style='display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#131313;color:#888;font-family:sans-serif;margin:0;'><div style='text-align:center;'><h3>Zlides V2 Preview</h3><p style='font-size:12px;color:#555;'>Your generated presentation will appear here.</p></div></body></html>";
 
   let promptText = "";
   let files: FileList | null = null;
   let extractedMarkdown = "";
+  let uploadMode = "content"; // 'content' or 'style'
 
   onMount(async () => {
     // Load styles from the backend
@@ -53,8 +54,11 @@
   });
 
   async function updateCost() {
-    if (!promptText.trim() && !files) {
-      cost = 0;
+    if (isGenerating) return;
+    if (!promptText.trim() && !files && !extractedMarkdown) {
+      if (slides.length === 0) {
+        cost = 0;
+      }
       return;
     }
     try {
@@ -62,8 +66,10 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: promptText + extractedMarkdown,
-          files_attached: files ? files.length : 0
+          prompt: promptText + (extractedMarkdown || ""),
+          files_attached: files ? files.length : 0,
+          format: selectedFormat,
+          page_count: pageCount
         })
       });
       const data = await res.json();
@@ -73,7 +79,14 @@
     }
   }
 
-  $: promptText, updateCost();
+  $: {
+    promptText;
+    extractedMarkdown;
+    files;
+    selectedFormat;
+    pageCount;
+    updateCost();
+  }
   $: isBatchMode = promptText.toLowerCase().includes("batch") || promptText.includes("\n\n");
 
   async function handleFileSelect(e: Event) {
@@ -86,8 +99,7 @@
       const formData = new FormData();
       formData.append("file", files[0]);
 
-      const isStyle = promptText.toLowerCase().includes("style") || files[0].type.includes("image");
-      formData.append("type", isStyle ? "style" : "file");
+      formData.append("type", uploadMode);
 
       try {
         const res = await fetch("/upload", { method: "POST", body: formData });
@@ -97,6 +109,17 @@
 
         if (data.style_extracted) {
           status = `Reverse engineered style "${data.style_extracted.name}" saved!`;
+          // Dynamically add to availableStyles so it shows up in Style Theme dropdown instantly
+          availableStyles = [
+            ...availableStyles,
+            {
+              id: data.style_extracted.id,
+              name: data.style_extracted.name,
+              preview_colors: data.style_extracted.preview_colors || [],
+              brand_png: data.style_extracted.brand_png
+            }
+          ];
+          selectedStyle = data.style_extracted.id;
         } else {
           status = "File parsed into Markdown. Ready to generate.";
         }
@@ -126,7 +149,6 @@ let currentController: AbortController | null = null;
   let selectedFormat = "slides";
   let selectedStyle = "auto";
   let pageCount = 5;
-  let slideLayout = "";
   let availableStyles: any[] = [];
 
 
@@ -208,6 +230,13 @@ let currentController: AbortController | null = null;
     status = "Generating...";
     addMessage(`[${selectedFormat} / ${selectedStyle}] ${textToSend}`, 'user');
 
+    // Estimate input cost dynamically
+    const combinedInputText = textToSend + (extractedMarkdown ? "\n\n" + extractedMarkdown : "");
+    const estimatedInputTokens = (combinedInputText.split(/\s+/).filter(Boolean).length) * 1.5 + (files ? files.length * 3000 : 0);
+    const inputCostRmb = (estimatedInputTokens / 1000000.0) * 0.8;
+    const initialInputCost = inputCostRmb * 2.5 * 0.14;
+    cost = initialInputCost;
+    let totalOutputChars = 0;
 
     currentController = new AbortController();
     liveHtmlChunks = [];
@@ -227,7 +256,6 @@ let currentController: AbortController | null = null;
           format: selectedFormat,
           style: selectedStyle,
           page_count: pageCount,
-          layout: slideLayout,
         }),
         signal: currentController.signal
       });
@@ -254,6 +282,19 @@ let currentController: AbortController | null = null;
 
               try {
                 const data = JSON.parse(dataStr);
+
+                // Accumulate output characters for live cost ticker
+                let chunkChars = 0;
+                if (data.text) chunkChars += data.text.length;
+                if (data.html && data.type !== 'final_html') chunkChars += data.html.length;
+                
+                if (chunkChars > 0) {
+                  totalOutputChars += chunkChars;
+                  const liveOutputTokens = totalOutputChars / 2.5;
+                  const outputCostRmb = (liveOutputTokens / 1000000.0) * 2.0;
+                  const liveOutputCost = outputCostRmb * 2.5 * 0.14;
+                  cost = initialInputCost + liveOutputCost;
+                }
 
                 if (data.type === 'thinking') {
                   thinkingBuffer += data.text;
@@ -413,83 +454,72 @@ isThinking = false;
 
 <main class="min-h-screen bg-ge-bg text-ge-text flex flex-col md:flex-row h-screen overflow-hidden">
 
-  <div class="w-full md:w-6/12 p-6 flex flex-col gap-4 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-y-auto">
-    <div class="space-y-2 flex-shrink-0">
+  <div class="w-full md:w-[400px] p-4 flex flex-col gap-3 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-y-auto">
+    <div class="space-y-1 flex-shrink-0">
       <div class="flex items-center gap-2 flex-wrap">
-        <h1 class="text-3xl font-bold tracking-tight text-ge-accent font-raleway">Zlides V2</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-ge-accent font-raleway">Zlides V2</h1>
         {#if isBatchMode}
-          <span class="bg-ge-bg text-xs px-2 py-1 rounded border border-ge-border text-ge-accent animate-pulse">Batch Mode</span>
+          <span class="bg-ge-bg text-[10px] px-1.5 py-0.5 rounded border border-ge-border text-ge-accent animate-pulse">Batch Mode</span>
         {:else}
-          <span class="bg-ge-bg text-xs px-2 py-1 rounded border border-ge-border text-ge-text-muted">Mongoose Fast</span>
+          <span class="bg-ge-bg text-[10px] px-1.5 py-0.5 rounded border border-ge-border text-ge-text-muted">Mongoose Fast</span>
         {/if}
-        <span class="bg-ge-bg text-[10px] px-2 py-1 rounded border border-ge-border text-ge-success font-mono font-bold" title="Estimated Cost">
-          ${cost.toFixed(3)} USD
+        <span class="bg-ge-bg text-[10px] px-1.5 py-0.5 rounded border border-ge-border text-ge-success font-mono font-bold" title="Estimated Cost">
+          ${cost.toFixed(3)}
         </span>
-        <span class="relative flex h-2.5 w-2.5 ml-1" title={isGenerating || isUploading ? 'Processing...' : 'Ready'}>
+        <span class="relative flex h-2 w-2 ml-1" title={isGenerating || isUploading ? 'Processing...' : 'Ready'}>
           {#if isGenerating || isUploading}
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gradient-to-r from-red-700 to-orange-500 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-gradient-to-r from-red-700 to-orange-500"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-gradient-to-r from-red-700 to-orange-500"></span>
           {:else}
-            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-ge-success"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-ge-success"></span>
           {/if}
         </span>
       </div>
-      <p class="text-ge-text-muted text-sm">Drop vibes. Get slides. The smart parser extracts layout + style from uploaded files.</p>
+      <p class="text-ge-text-muted text-xs">Drop vibes. Get slides.</p>
     </div>
 
     <!-- UI Controls -->
     <div class="flex flex-col gap-2 flex-shrink-0 text-xs">
-      <div class="grid grid-cols-2 gap-2">
-        <div class="flex flex-col gap-1">
-          <span class="text-[10px] text-ge-text-muted font-mono uppercase tracking-wider">Format</span>
-          <select bind:value={selectedFormat} class="bg-ge-bg border border-ge-border rounded px-2 py-1.5 text-ge-text outline-none focus:border-ge-accent cursor-pointer w-full">
+      <div class="grid grid-cols-3 gap-1.5">
+        <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text-muted focus-within:border-ge-accent">
+          <span class="text-[9px] font-mono uppercase font-bold tracking-wider select-none text-ge-text-muted/65">Fmt</span>
+          <select bind:value={selectedFormat} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 min-w-0">
             {#each ["slides", "poster", "worksheet", "report", "rr"] as fmt}
               <option value={fmt} class="bg-ge-card text-ge-text">{fmt}</option>
             {/each}
           </select>
         </div>
 
-        <div class="flex flex-col gap-1">
-          <span class="text-[10px] text-ge-text-muted font-mono uppercase tracking-wider">Style Theme</span>
-          <select bind:value={selectedStyle} class="bg-ge-bg border border-ge-border rounded px-2 py-1.5 text-ge-text outline-none focus:border-ge-accent cursor-pointer w-full">
+        <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text-muted focus-within:border-ge-accent">
+          <span class="text-[9px] font-mono uppercase font-bold tracking-wider select-none text-ge-text-muted/65">Style</span>
+          <select bind:value={selectedStyle} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 min-w-0">
             {#each availableStyles as style}
               <option value={style.id} class="bg-ge-card text-ge-text">{style.name}</option>
             {/each}
           </select>
         </div>
-      </div>
 
-      <div class="grid grid-cols-2 gap-2 mt-1">
-        <div class="flex flex-col gap-1">
-          <span class="text-[10px] text-ge-text-muted font-mono uppercase tracking-wider">Pages</span>
-          <input type="number" bind:value={pageCount} min="1" max="20" class="bg-ge-bg border border-ge-border rounded px-2 py-1.5 text-ge-text outline-none focus:border-ge-accent w-full" title="Page Count">
-        </div>
-
-        <div class="flex flex-col gap-1">
-          <span class="text-[10px] text-ge-text-muted font-mono uppercase tracking-wider">Layout</span>
-          <select bind:value={slideLayout} class="bg-ge-bg border border-ge-border rounded px-2 py-1.5 text-ge-text outline-none focus:border-ge-accent cursor-pointer w-full">
-            <option value="" class="bg-ge-card text-ge-text">Auto</option>
-            <option value="title-content" class="bg-ge-card text-ge-text">Title + Content</option>
-            <option value="two-column" class="bg-ge-card text-ge-text">Two Column</option>
-          </select>
+        <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text-muted focus-within:border-ge-accent">
+          <span class="text-[9px] font-mono uppercase font-bold tracking-wider select-none text-ge-text-muted/65">Pages</span>
+          <input type="number" bind:value={pageCount} min="1" max="20" class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 w-full text-xs p-0 min-w-0" title="Page Count">
         </div>
       </div>
     </div>
 
     <!-- Chat History -->
-    <div id="chat-history" class="flex-grow overflow-y-auto flex flex-col gap-2 p-2 bg-ge-bg rounded-lg border border-ge-border relative neumorphic-inset text-sm">
+    <div id="chat-history" class="flex-grow overflow-y-auto flex flex-col gap-2.5 p-3 bg-ge-bg/30 rounded-lg border border-ge-border/40 relative text-sm neumorphic-inset">
       {#each chatMessages as msg}
         {#if msg.role !== 'thinking'}
-        <div class="p-2 rounded max-w-[90%] whitespace-pre-wrap {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border' : 'bg-transparent text-ge-text-muted mr-auto'}">
+        <div class="p-2.5 rounded-lg max-w-[85%] whitespace-pre-wrap {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border/60 shadow-sm' : 'bg-ge-bg/55 text-ge-text-muted mr-auto border border-ge-border/30'}">
           {#if msg.role !== 'user'}
-            <div class="text-xs font-bold mb-1 text-ge-accent">Z.AI Agent</div>
+            <div class="text-[9px] font-mono font-bold mb-1 text-ge-accent uppercase tracking-wider select-none">Z.AI Agent</div>
           {/if}
           {#if msg.role === 'agent' || msg.role === 'thinking'}
-            <div class="prose prose-invert prose-sm max-w-none">
+            <div class="prose prose-invert prose-sm max-w-none text-ge-text-muted">
               <SvelteMarkdown source={msg.text} extensions={[markedMermaid()]} {renderers} />
             </div>
           {:else}
-            {msg.text}
+            <div class="text-ge-text text-xs">{msg.text}</div>
           {/if}
         </div>
         {/if}
@@ -531,44 +561,83 @@ isThinking = false;
     </div>
 
     <div class="flex flex-col gap-2 flex-shrink-0">
-      <div class="flex flex-col bg-ge-bg rounded-lg p-2.5 border border-ge-border neumorphic-inset min-h-[220px] flex-shrink-0">
+      <div class="flex flex-col bg-ge-bg rounded-lg p-2.5 border border-ge-border neumorphic-inset relative min-h-[140px] flex-shrink-0">
         <textarea
           bind:value={promptText}
           on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } }}
           placeholder="Describe your vibe... (e.g. 'Turn this uploaded PDF into slides.')"
-          class="w-full flex-grow bg-transparent border-none outline-none resize-none p-1 text-ge-text placeholder:text-ge-text-muted/50 text-sm"
+          class="w-full flex-grow bg-transparent border-none outline-none resize-none p-1 pb-10 text-ge-text placeholder:text-ge-text-muted/50 text-sm"
         ></textarea>
 
-        <div class="flex justify-between items-center bg-ge-card rounded-md p-1.5 mt-2 border border-ge-border/30">
-           <label class="cursor-pointer p-1.5 rounded bg-ge-bg hover:bg-ge-card hover:text-ge-accent hover:border-ge-accent/50 border border-ge-border transition-colors disabled:opacity-50 flex items-center justify-center" title="Ingest Document or Style Image" class:opacity-50={isUploading}>
-             {#if isUploading}
-               <span class="animate-spin h-4 w-4 border-2 border-ge-accent border-t-transparent rounded-full"></span>
-             {:else}
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-             {/if}
-             <input type="file" class="hidden" on:change={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" disabled={isUploading} />
-           </label>
+        <!-- Floating action buttons at the bottom of the input container -->
+        <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center pointer-events-none">
+           <div class="flex items-center gap-1.5 pointer-events-auto">
+             <label class="cursor-pointer p-1.5 rounded bg-ge-card hover:bg-ge-border text-ge-text hover:text-ge-accent border border-ge-border transition-colors disabled:opacity-50 flex items-center justify-center h-7 w-7" title="Ingest Document or Style Image" class:opacity-50={isUploading}>
+               {#if isUploading}
+                 <span class="animate-spin h-3.5 w-3.5 border-2 border-ge-accent border-t-transparent rounded-full"></span>
+               {:else}
+                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+               {/if}
+               <input type="file" class="hidden" on:change={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" disabled={isUploading} />
+             </label>
 
-           <div class="flex items-center gap-2">
-             {#if files}
-               <span class="text-xs text-ge-accent truncate max-w-[200px] mr-1" title={files[0].name}>{files[0].name}</span>
-             {/if}
-             {#if isGenerating}
-               <button on:click={stopRequest} class="bg-ge-danger text-ge-bg font-bold px-3 py-1.5 rounded text-xs hover:opacity-90 transition-all flex items-center gap-1">
-                 <span class="h-2 w-2 bg-ge-bg rounded-sm"></span> Stop
-               </button>
-             {/if}
+             <select bind:value={uploadMode} class="bg-ge-card border border-ge-border rounded px-1.5 py-0.5 text-[10px] text-ge-text-muted outline-none focus:border-ge-accent cursor-pointer h-7 select-none">
+               <option value="content" class="bg-ge-card text-ge-text">Remake Content</option>
+               <option value="style" class="bg-ge-card text-ge-text">Harvest Style</option>
+             </select>
            </div>
+
+            <div class="flex items-center gap-2 pointer-events-auto">
+              {#if files}
+                <span class="text-[11px] bg-ge-card border border-ge-border px-2 py-0.5 rounded text-ge-accent truncate max-w-[150px]" title={files[0].name}>{files[0].name}</span>
+              {/if}
+              {#if isGenerating}
+                <button on:click={stopRequest} class="bg-ge-danger text-ge-bg font-bold px-3 py-1 rounded text-xs hover:opacity-90 transition-all flex items-center gap-1 h-7 animate-pulse">
+                  <span class="h-1.5 w-1.5 bg-ge-bg rounded-sm"></span> Stop
+                </button>
+              {:else}
+                <button
+                  on:click={generate}
+                  disabled={!promptText.trim() && !extractedMarkdown}
+                  class="bg-ge-accent text-ge-bg rounded flex items-center justify-center h-7 w-7 hover:opacity-90 transition-all disabled:opacity-50 border border-ge-border/20 shadow-sm"
+                  title="Send Command"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+              {/if}
+            </div>
         </div>
       </div>
-
-
     </div>
   </div>
 
   <div class="flex-grow bg-ge-bg relative flex flex-col">
     <div class="h-12 border-b border-ge-border flex justify-between items-center px-4 bg-ge-card/50">
-      <div class="text-xs font-raleway font-bold">Preview Stage (RR Enabled)</div>
+      <div class="text-xs font-raleway font-bold text-ge-accent">Preview</div>
+      
+      <!-- Slide controls in the center -->
+      <div class="flex items-center gap-2 text-xs">
+        <button
+          class="p-1 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50 flex items-center justify-center h-7 w-7 text-ge-text"
+          disabled={slides.length === 0 || currentSlideIndex <= 0}
+          on:click={() => { if (currentSlideIndex > 0) { currentSlideIndex--; iframeSrcDoc = slides[currentSlideIndex].html; } }}
+          title="Previous Slide"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <span class="font-mono text-ge-text-muted select-none min-w-[70px] text-center">
+          {slides.length ? currentSlideIndex + 1 : 0} / {slides.length}
+        </span>
+        <button
+          class="p-1 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50 flex items-center justify-center h-7 w-7 text-ge-text"
+          disabled={slides.length === 0 || currentSlideIndex >= slides.length - 1}
+          on:click={() => { if (currentSlideIndex < slides.length - 1) { currentSlideIndex++; iframeSrcDoc = slides[currentSlideIndex].html; } }}
+          title="Next Slide"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+
       <div class="flex gap-2">
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => window.print()}>Export PDF</button>
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => {
@@ -585,29 +654,15 @@ isThinking = false;
     </div>
 
     <div class="flex-grow p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
-      <div class="w-full h-full max-w-5xl bg-white rounded shadow-2xl border border-ge-border overflow-hidden relative neumorphic" style="aspect-ratio: 16/9;">
+      <div class="w-full h-full max-w-5xl bg-transparent rounded shadow-2xl border border-ge-border/30 overflow-hidden relative" style="aspect-ratio: 16/9;">
         <iframe
           bind:this={iframeElement}
           title="Slide Preview"
           srcdoc={iframeSrcDoc}
-          class="w-full h-full bg-white"
+          class="w-full h-full bg-transparent"
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         ></iframe>
       </div>
-    </div>
-
-    <div class="h-14 border-t border-ge-border flex items-center justify-center gap-4 bg-ge-card/50">
-      <button
-        class="px-4 py-1.5 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50"
-        disabled={slides.length === 0 || currentSlideIndex <= 0}
-        on:click={() => { if (currentSlideIndex > 0) { currentSlideIndex--; iframeSrcDoc = slides[currentSlideIndex].html; } }}
-      >Prev</button>
-      <span class="text-sm font-mono text-ge-text-muted">Slide {slides.length ? currentSlideIndex + 1 : 0} of {slides.length}</span>
-      <button
-        class="px-4 py-1.5 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50"
-        disabled={slides.length === 0 || currentSlideIndex >= slides.length - 1}
-        on:click={() => { if (currentSlideIndex < slides.length - 1) { currentSlideIndex++; iframeSrcDoc = slides[currentSlideIndex].html; } }}
-      >Next</button>
     </div>
   </div>
 
