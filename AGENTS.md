@@ -226,3 +226,8 @@ Core: `fastapi`, `uvicorn`, `httpx`, `pydantic`, `pyjwt`, `python-dotenv`, `pyth
 Dev: `pytest`
 
 Frontend uses CDN-loaded `html2canvas` for PNG export; no build step.
+
+## Package Management & Scripts
+
+- Use **`bun`** exclusively for Node package management and running frontend scripts in `frontend_svelte` (e.g., `bun install`, `bun run dev`, `bun run build`). Do not use `npm` or `yarn`.
+
