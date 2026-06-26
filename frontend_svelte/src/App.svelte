@@ -152,6 +152,7 @@ let currentController: AbortController | null = null;
   let availableStyles: any[] = [];
 
   let showStyleEditor = false;
+  let showAdvancedColors = false;
   let editingStyleId = "";
   let editingStyleName = "";
   let editingStylePromptHint = "";
@@ -159,6 +160,11 @@ let currentController: AbortController | null = null;
   let editingStyleCard = "#f8f9fa";
   let editingStyleText = "#1e293b";
   let editingStyleAccent = "#2563eb";
+  let editingStyleTextSecondary = "#64748b";
+  let editingStyleBorder = "#e2e8f0";
+  let editingStyleSuccess = "#16a34a";
+  let editingStyleDanger = "#dc2626";
+  let editingStyleAccentHover = "#1d4ed8";
 
   async function openStyleEditor() {
     if (selectedStyle === 'auto') return;
@@ -175,6 +181,11 @@ let currentController: AbortController | null = null;
       editingStyleCard = style.css?.card || "#f8f9fa";
       editingStyleText = style.css?.text || "#1e293b";
       editingStyleAccent = style.css?.accent || "#2563eb";
+      editingStyleTextSecondary = style.css?.text_secondary || "#64748b";
+      editingStyleBorder = style.css?.border || "#e2e8f0";
+      editingStyleSuccess = style.css?.success || "#16a34a";
+      editingStyleDanger = style.css?.danger || "#dc2626";
+      editingStyleAccentHover = style.css?.accent_hover || "#1d4ed8";
 
       showStyleEditor = true;
       status = "Ready";
@@ -191,6 +202,11 @@ let currentController: AbortController | null = null;
     editingStyleCard = "#f8f9fa";
     editingStyleText = "#1e293b";
     editingStyleAccent = "#2563eb";
+    editingStyleTextSecondary = "#64748b";
+    editingStyleBorder = "#e2e8f0";
+    editingStyleSuccess = "#16a34a";
+    editingStyleDanger = "#dc2626";
+    editingStyleAccentHover = "#1d4ed8";
 
     showStyleEditor = true;
   }
@@ -210,12 +226,12 @@ let currentController: AbortController | null = null;
           bg: editingStyleBg,
           card: editingStyleCard,
           text: editingStyleText,
+          text_secondary: editingStyleTextSecondary,
           accent: editingStyleAccent,
-          text_secondary: editingStyleText + "aa",
-          accent_hover: editingStyleAccent,
-          border: editingStyleText + "22",
-          success: "#16a34a",
-          danger: "#dc2626"
+          accent_hover: editingStyleAccentHover,
+          border: editingStyleBorder,
+          success: editingStyleSuccess,
+          danger: editingStyleDanger
         },
         preview_colors: [editingStyleBg, editingStyleCard, editingStyleAccent, editingStyleText]
       };
@@ -786,6 +802,60 @@ isThinking = false;
                   <input type="text" bind:value={editingStyleAccent} class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-[10px]" />
                 </div>
               </div>
+            </div>
+
+            <div class="mt-2 flex flex-col gap-2">
+              <button on:click={() => showAdvancedColors = !showAdvancedColors} class="text-[9px] uppercase font-bold text-ge-accent flex items-center gap-1 self-start select-none transition-colors hover:text-ge-accent-hover bg-transparent border-none cursor-pointer p-0" type="button">
+                {#if showAdvancedColors}
+                  <span>▼ Hide Advanced Colors</span>
+                {:else}
+                  <span>▶ Show Advanced Colors</span>
+                {/if}
+              </button>
+
+              {#if showAdvancedColors}
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-ge-border/30">
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[9px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Secondary Text</label>
+                    <div class="flex items-center gap-1">
+                      <input type="color" bind:value={editingStyleTextSecondary} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleTextSecondary} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-[9px]" />
+                    </div>
+                  </div>
+
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[9px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Border Color</label>
+                    <div class="flex items-center gap-1">
+                      <input type="color" bind:value={editingStyleBorder} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleBorder} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-[9px]" />
+                    </div>
+                  </div>
+
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[9px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Accent Hover</label>
+                    <div class="flex items-center gap-1">
+                      <input type="color" bind:value={editingStyleAccentHover} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleAccentHover} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-[9px]" />
+                    </div>
+                  </div>
+
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[9px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Success Color</label>
+                    <div class="flex items-center gap-1">
+                      <input type="color" bind:value={editingStyleSuccess} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleSuccess} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-[9px]" />
+                    </div>
+                  </div>
+
+                  <div class="flex flex-col gap-1 col-span-2">
+                    <label class="text-[9px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Danger Color</label>
+                    <div class="flex items-center gap-1">
+                      <input type="color" bind:value={editingStyleDanger} class="h-5 w-5 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                      <input type="text" bind:value={editingStyleDanger} class="bg-ge-bg border border-ge-border rounded p-0.5 outline-none text-ge-text text-center w-full font-mono text-[9px]" />
+                    </div>
+                  </div>
+                </div>
+              {/if}
             </div>
 
             <div class="flex gap-2 mt-auto pt-4 border-t border-ge-border">
