@@ -326,18 +326,27 @@ let currentController: AbortController | null = null;
                     thoughts = [...thoughts, thinkingBuffer.trim()];
                     thinkingBuffer = '';
                   }
+                  if (data.tool) {
+                    toolCalls = [...toolCalls, { name: data.tool, input: `Render slide page at position ${data.position || ''}` }];
+                  }
                   liveHtmlChunks.push(data.html || '');
                   renderLiveHtmlChunks();
                 }
 
                 if (data.type === 'slide_remove') {
                   console.log("Removing slides at positions:", data.positions);
+                  if (data.tool) {
+                    toolCalls = [...toolCalls, { name: data.tool, input: `Remove slides at positions ${data.positions || ''}` }];
+                  }
                 }
 
                 if (data.type === 'slide_replace') {
                   if (thinkingBuffer.trim()) {
                     thoughts = [...thoughts, thinkingBuffer.trim()];
                     thinkingBuffer = '';
+                  }
+                  if (data.tool) {
+                    toolCalls = [...toolCalls, { name: data.tool, input: `Replace slide at position ${data.position || ''}` }];
                   }
                   liveHtmlChunks.push(data.html || '');
                   renderLiveHtmlChunks();
@@ -346,6 +355,9 @@ let currentController: AbortController | null = null;
                 if (data.type === 'slide_navigate') {
                   if (data.position && data.position.length > 0) {
                     currentSlideIndex = Math.max(0, data.position[0] - 1);
+                  }
+                  if (data.tool) {
+                    toolCalls = [...toolCalls, { name: data.tool, input: `Navigate to position ${data.position || ''}` }];
                   }
                 }
 
@@ -403,48 +415,64 @@ isThinking = false;
 
   <div class="w-full md:w-6/12 p-6 flex flex-col gap-4 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-y-auto">
     <div class="space-y-2 flex-shrink-0">
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         <h1 class="text-3xl font-bold tracking-tight text-ge-accent font-raleway">Zlides V2</h1>
         {#if isBatchMode}
           <span class="bg-ge-bg text-xs px-2 py-1 rounded border border-ge-border text-ge-accent animate-pulse">Batch Mode</span>
         {:else}
           <span class="bg-ge-bg text-xs px-2 py-1 rounded border border-ge-border text-ge-text-muted">Mongoose Fast</span>
         {/if}
+        <span class="bg-ge-bg text-[10px] px-2 py-1 rounded border border-ge-border text-ge-success font-mono font-bold" title="Estimated Cost">
+          ${cost.toFixed(3)} USD
+        </span>
+        <span class="relative flex h-2.5 w-2.5 ml-1" title={isGenerating || isUploading ? 'Processing...' : 'Ready'}>
+          {#if isGenerating || isUploading}
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gradient-to-r from-red-700 to-orange-500 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-gradient-to-r from-red-700 to-orange-500"></span>
+          {:else}
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-ge-success"></span>
+          {/if}
+        </span>
       </div>
       <p class="text-ge-text-muted text-sm">Drop vibes. Get slides. The smart parser extracts layout + style from uploaded files.</p>
     </div>
 
     <!-- UI Controls -->
-    <div class="flex flex-col gap-2 flex-shrink-0 text-sm">
-      <div class="flex gap-2 flex-wrap">
-        {#each ["slides", "poster", "worksheet", "report", "rr"] as fmt}
-          <button
-            class="px-3 py-1 rounded-full border border-ge-border transition-colors {selectedFormat === fmt ? 'bg-gradient-to-r from-red-700 to-orange-500 text-white font-bold border-transparent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
-            on:click={() => selectedFormat = fmt}
-          >
-            {fmt}
-          </button>
-        {/each}
+    <div class="flex flex-col gap-2 flex-shrink-0 text-xs">
+      <div class="grid grid-cols-2 gap-2">
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-ge-text-muted font-mono uppercase tracking-wider">Format</span>
+          <select bind:value={selectedFormat} class="bg-ge-bg border border-ge-border rounded px-2 py-1.5 text-ge-text outline-none focus:border-ge-accent cursor-pointer w-full">
+            {#each ["slides", "poster", "worksheet", "report", "rr"] as fmt}
+              <option value={fmt} class="bg-ge-card text-ge-text">{fmt}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-ge-text-muted font-mono uppercase tracking-wider">Style Theme</span>
+          <select bind:value={selectedStyle} class="bg-ge-bg border border-ge-border rounded px-2 py-1.5 text-ge-text outline-none focus:border-ge-accent cursor-pointer w-full">
+            {#each availableStyles as style}
+              <option value={style.id} class="bg-ge-card text-ge-text">{style.name}</option>
+            {/each}
+          </select>
+        </div>
       </div>
 
-      <div class="flex gap-2 flex-wrap mt-2">
-        {#each availableStyles as style}
-          <button
-            class="px-3 py-1 rounded-full border border-ge-border transition-colors text-xs {selectedStyle === style.id ? 'bg-gradient-to-r from-red-700 to-orange-500 text-white font-bold border-transparent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
-            on:click={() => selectedStyle = style.id}
-          >
-            {style.name}
-          </button>
-        {/each}
-      </div>
+      <div class="grid grid-cols-2 gap-2 mt-1">
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-ge-text-muted font-mono uppercase tracking-wider">Pages</span>
+          <input type="number" bind:value={pageCount} min="1" max="20" class="bg-ge-bg border border-ge-border rounded px-2 py-1.5 text-ge-text outline-none focus:border-ge-accent w-full" title="Page Count">
+        </div>
 
-      <div class="flex gap-2 mt-2">
-        <input type="number" bind:value={pageCount} min="1" max="20" class="bg-ge-bg border border-ge-border rounded px-2 py-1 w-20 text-ge-text outline-none focus:border-ge-accent" title="Page Count">
-        <select bind:value={slideLayout} class="bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text flex-grow outline-none focus:border-ge-accent cursor-pointer">
-          <option value="" class="bg-ge-card text-ge-text">Layout: Auto</option>
-          <option value="title-content" class="bg-ge-card text-ge-text">Title+Content</option>
-          <option value="two-column" class="bg-ge-card text-ge-text">Two Column</option>
-        </select>
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-ge-text-muted font-mono uppercase tracking-wider">Layout</span>
+          <select bind:value={slideLayout} class="bg-ge-bg border border-ge-border rounded px-2 py-1.5 text-ge-text outline-none focus:border-ge-accent cursor-pointer w-full">
+            <option value="" class="bg-ge-card text-ge-text">Auto</option>
+            <option value="title-content" class="bg-ge-card text-ge-text">Title + Content</option>
+            <option value="two-column" class="bg-ge-card text-ge-text">Two Column</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -522,44 +550,20 @@ isThinking = false;
              <input type="file" class="hidden" on:change={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" disabled={isUploading} />
            </label>
 
-           {#if files}
-             <span class="text-xs text-ge-accent truncate max-w-[120px]" title={files[0].name}>{files[0].name}</span>
-           {/if}
+           <div class="flex items-center gap-2">
+             {#if files}
+               <span class="text-xs text-ge-accent truncate max-w-[120px] mr-1" title={files[0].name}>{files[0].name}</span>
+             {/if}
+             {#if isGenerating}
+               <button on:click={stopRequest} class="bg-ge-danger text-ge-bg font-bold px-3 py-1.5 rounded text-xs hover:opacity-90 transition-all flex items-center gap-1">
+                 <span class="h-2 w-2 bg-ge-bg rounded-sm"></span> Stop
+               </button>
+             {/if}
+           </div>
         </div>
       </div>
 
-      <div class="p-1 px-3 bg-ge-bg rounded-md font-mono text-[10px] border border-ge-border flex justify-between items-center">
-        <span class="text-ge-text-muted flex items-center gap-2">
-          <span class="relative flex h-2 w-2">
-            {#if isGenerating || isUploading}
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gradient-to-r from-red-700 to-orange-500 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-gradient-to-r from-red-700 to-orange-500"></span>
-            {:else}
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-ge-success"></span>
-            {/if}
-          </span>
-          Estimated Cost
-        </span>
-        <span class="text-ge-success font-bold text-xs">${cost.toFixed(3)} USD</span>
-      </div>
 
-      <div class="flex gap-2">
-        {#if isGenerating && !isBatchMode}
-          <button
-            on:click={stopRequest}
-            class="flex-grow bg-ge-danger text-ge-bg font-bold py-3 rounded-lg hover:bg-ge-danger/80 transition-colors shadow-lg">
-            Stop
-          </button>
-        {:else}
-          <button
-            on:click={generate}
-            disabled={isGenerating || isUploading}
-            class="flex-grow bg-gradient-to-r from-red-700 to-orange-500 text-ge-bg font-bold py-3 rounded-lg hover:opacity-90 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-            {isGenerating ? (isBatchMode ? 'Batching...' : 'Generating...') : (isBatchMode ? 'Schedule Batch' : 'Generate')}
-          </button>
-        {/if}
-      </div>
-      <div class="text-center text-xs text-ge-text-muted font-mono h-4 truncate">{status}</div>
     </div>
   </div>
 
