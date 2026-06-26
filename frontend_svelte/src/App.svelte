@@ -12,6 +12,9 @@
       mermaid: MermaidRenderer
   };
 
+  import * as ChainOfThought from '$lib/components/ai-elements/chain-of-thought';
+
+
   let cost = 0.00;
   let isGenerating = false;
   let isBatchMode = false;
@@ -105,7 +108,15 @@
     }
   }
 
-  let currentController: AbortController | null = null;
+
+  let isThinking = false;
+  let thoughts: string[] = [];
+
+  let toolCalls: { name: string, input: string }[] = [];
+  let currentToolBuffer = '';
+  let currentToolName = '';
+
+let currentController: AbortController | null = null;
   let liveHtmlChunks: string[] = [];
   let iframeElement: HTMLIFrameElement | null = null;
   let thinkingBuffer = '';
@@ -117,6 +128,22 @@
   let pageCount = 5;
   let slideLayout = "";
   let availableStyles: any[] = [];
+
+
+  function extractImages(thought: string) {
+    const images = [];
+    const regex = /!\[(.*?)\]\((.*?)\)/g;
+    let match;
+    while ((match = regex.exec(thought)) !== null) {
+      images.push({ alt: match[1], url: match[2] });
+    }
+    return images;
+  }
+
+  function stripImages(thought: string) {
+    return thought.replace(/!\[(.*?)\]\((.*?)\)/g, '').trim();
+  }
+
 
   function renderLiveHtmlChunks() {
     const combined = liveHtmlChunks.join('')
@@ -180,11 +207,16 @@
     promptText = "";
     status = "Generating...";
     addMessage(`[${selectedFormat} / ${selectedStyle}] ${textToSend}`, 'user');
-    addMessage('[Thinking...]', 'thinking'); // placeholder
+
 
     currentController = new AbortController();
     liveHtmlChunks = [];
     thinkingBuffer = '';
+    thoughts = [];
+    toolCalls = [];
+    currentToolBuffer = '';
+    currentToolName = '';
+    isThinking = true;
 
     try {
       const response = await fetch('/command', {
@@ -225,25 +257,60 @@
 
                 if (data.type === 'thinking') {
                   thinkingBuffer += data.text;
-                  if (thinkingBuffer.length > 20) {
-                    // Update the last thinking message
-                    const lastMsg = chatMessages[chatMessages.length - 1];
-                    if (lastMsg && lastMsg.role === 'thinking') {
-                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
-                      chatMessages = [...chatMessages];
-                    }
-                    thinkingBuffer = '';
+
+                  // Simple heuristic: if we hit a newline or sentence end, push a thought.
+                  if (thinkingBuffer.match(/[\.\n]/)) {
+                      let sentences = thinkingBuffer.split(/(?<=[\.\n])/);
+                      for (let i = 0; i < sentences.length - 1; i++) {
+                         let s = sentences[i].trim();
+                         if (s) thoughts = [...thoughts, s];
+                      }
+                      thinkingBuffer = sentences[sentences.length - 1];
+                  } else if (thinkingBuffer.length > 50) {
+                      // fallback if no punctuation but long text
+                      thoughts = [...thoughts, thinkingBuffer.trim()];
+                      thinkingBuffer = '';
                   }
                 }
 
+                                if (data.type === 'tool') {
+                  if (data.tool_name) {
+                     // Flush previous
+                     if (currentToolName && currentToolBuffer) {
+                         toolCalls = [...toolCalls, { name: currentToolName, input: currentToolBuffer }];
+                     }
+                     currentToolName = data.tool_name;
+                     currentToolBuffer = data.input || '';
+                  } else if (data.input) {
+                     currentToolBuffer += data.input;
+                  }
+
+                  // In some stream representations it comes in as raw tool blocks, just handle generic JSON representations
+                  try {
+                      if (data.text) {
+                         let parsed = JSON.parse(data.text);
+                         if (parsed.tool_name) {
+                             toolCalls = [...toolCalls, { name: parsed.tool_name, input: parsed.input || '' }];
+                         }
+                      }
+                  } catch (e) {}
+                }
+
+                if (data.type === 'answer' || data.type === 'slide_page' || data.type === 'final_html' || data.type === 'error') {
+                   // Flush pending tool
+                   if (currentToolName && currentToolBuffer) {
+                       toolCalls = [...toolCalls, { name: currentToolName, input: currentToolBuffer }];
+                       currentToolName = '';
+                       currentToolBuffer = '';
+                   }
+                }
+
                 if (data.type === 'answer') {
-                  if (thinkingBuffer) {
-                    const lastMsg = chatMessages[chatMessages.length - 1];
-                    if (lastMsg && lastMsg.role === 'thinking') {
-                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
-                    }
+                  if (thinkingBuffer.trim()) {
+                    thoughts = [...thoughts, thinkingBuffer.trim()];
                     thinkingBuffer = '';
                   }
+                  isThinking = false;
 
                   const lastMsg = chatMessages[chatMessages.length - 1];
                   if (lastMsg && lastMsg.role === 'agent') {
@@ -255,11 +322,8 @@
                 }
 
                 if (data.type === 'slide_page') {
-                  if (thinkingBuffer) {
-                    const lastMsg = chatMessages[chatMessages.length - 1];
-                    if (lastMsg && lastMsg.role === 'thinking') {
-                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
-                    }
+                  if (thinkingBuffer.trim()) {
+                    thoughts = [...thoughts, thinkingBuffer.trim()];
                     thinkingBuffer = '';
                   }
                   liveHtmlChunks.push(data.html || '');
@@ -271,11 +335,8 @@
                 }
 
                 if (data.type === 'slide_replace') {
-                  if (thinkingBuffer) {
-                    const lastMsg = chatMessages[chatMessages.length - 1];
-                    if (lastMsg && lastMsg.role === 'thinking') {
-                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
-                    }
+                  if (thinkingBuffer.trim()) {
+                    thoughts = [...thoughts, thinkingBuffer.trim()];
                     thinkingBuffer = '';
                   }
                   liveHtmlChunks.push(data.html || '');
@@ -289,21 +350,12 @@
                 }
 
                 if (data.type === 'final_html') {
-                  if (thinkingBuffer) {
-                    const lastMsg = chatMessages[chatMessages.length - 1];
-                    if (lastMsg && lastMsg.role === 'thinking') {
-                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
-                    }
+                  if (thinkingBuffer.trim()) {
+                    thoughts = [...thoughts, thinkingBuffer.trim()];
                     thinkingBuffer = '';
                   }
 
-                  // Convert thinking message to agent message if it was just thinking
-                  const lastMsg = chatMessages[chatMessages.length - 1];
-                  if (lastMsg && lastMsg.role === 'thinking') {
-                    lastMsg.text = `[Complete — ${selectedFormat} / ${selectedStyle}]`;
-                    lastMsg.role = 'agent';
-                    chatMessages = [...chatMessages];
-                  }
+isThinking = false;
 
                   const html = data.html;
                   iframeSrcDoc = html;
@@ -317,22 +369,13 @@
                 }
 
                 if (data.type === 'error') {
-                  if (thinkingBuffer) {
-                    const lastMsg = chatMessages[chatMessages.length - 1];
-                    if (lastMsg && lastMsg.role === 'thinking') {
-                      lastMsg.text = lastMsg.text === '[Thinking...]' ? thinkingBuffer : lastMsg.text + thinkingBuffer;
-                    }
+                  if (thinkingBuffer.trim()) {
+                    thoughts = [...thoughts, thinkingBuffer.trim()];
                     thinkingBuffer = '';
                   }
 
-                  const lastMsg = chatMessages[chatMessages.length - 1];
-                  if (lastMsg && lastMsg.role === 'thinking') {
-                    lastMsg.text = 'Error: ' + data.text;
-                    lastMsg.role = 'agent';
-                    chatMessages = [...chatMessages];
-                  } else {
-                     addMessage('Error: ' + data.text, 'agent');
-                  }
+isThinking = false;
+                  addMessage('Error: ' + data.text, 'agent');
                   status = 'Error';
                 }
               } catch (e) {}
@@ -344,15 +387,10 @@
     } catch (err: any) {
       if (err.name === 'AbortError') {
         status = 'Stopped';
-        const lastMsg = chatMessages[chatMessages.length - 1];
-        if (lastMsg && lastMsg.role === 'thinking') {
-          lastMsg.text = '[Stopped]';
-          lastMsg.role = 'agent';
-          chatMessages = [...chatMessages];
-        }
+isThinking = false;
       } else {
         status = 'Error: ' + err.message;
-        addMessage('Connection error — is the server running on port 2828?', 'agent');
+        addMessage('Connection error — is the server running?', 'agent');
       }
     } finally {
       isGenerating = false;
@@ -363,7 +401,7 @@
 
 <main class="min-h-screen bg-ge-bg text-ge-text flex flex-col md:flex-row h-screen overflow-hidden">
 
-  <div class="w-full md:w-1/3 p-6 flex flex-col gap-4 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-hidden">
+  <div class="w-full md:w-6/12 p-6 flex flex-col gap-4 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-y-auto">
     <div class="space-y-2 flex-shrink-0">
       <div class="flex items-center gap-2">
         <h1 class="text-3xl font-bold tracking-tight text-ge-accent font-raleway">Zlides V2</h1>
@@ -381,7 +419,7 @@
       <div class="flex gap-2 flex-wrap">
         {#each ["slides", "poster", "worksheet", "report", "rr"] as fmt}
           <button
-            class="px-3 py-1 rounded-full border border-ge-border transition-colors {selectedFormat === fmt ? 'bg-ge-accent text-ge-bg font-bold border-ge-accent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
+            class="px-3 py-1 rounded-full border border-ge-border transition-colors {selectedFormat === fmt ? 'bg-gradient-to-r from-red-700 to-orange-500 text-white font-bold border-transparent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
             on:click={() => selectedFormat = fmt}
           >
             {fmt}
@@ -392,7 +430,7 @@
       <div class="flex gap-2 flex-wrap mt-2">
         {#each availableStyles as style}
           <button
-            class="px-3 py-1 rounded-full border border-ge-border transition-colors text-xs {selectedStyle === style.id ? 'bg-ge-accent text-ge-bg font-bold border-ge-accent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
+            class="px-3 py-1 rounded-full border border-ge-border transition-colors text-xs {selectedStyle === style.id ? 'bg-gradient-to-r from-red-700 to-orange-500 text-white font-bold border-transparent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
             on:click={() => selectedStyle = style.id}
           >
             {style.name}
@@ -413,9 +451,10 @@
     <!-- Chat History -->
     <div id="chat-history" class="flex-grow overflow-y-auto flex flex-col gap-2 p-2 bg-ge-bg rounded-lg border border-ge-border relative neumorphic-inset text-sm">
       {#each chatMessages as msg}
+        {#if msg.role !== 'thinking'}
         <div class="p-2 rounded max-w-[90%] whitespace-pre-wrap {msg.role === 'user' ? 'bg-ge-card text-ge-text ml-auto border border-ge-border' : 'bg-transparent text-ge-text-muted mr-auto'}">
           {#if msg.role !== 'user'}
-            <div class="text-xs font-bold mb-1 {msg.role === 'thinking' ? 'text-ge-accent/70' : 'text-ge-accent'}">{msg.role === 'thinking' ? 'Thinking...' : 'Z.AI Agent'}</div>
+            <div class="text-xs font-bold mb-1 text-ge-accent">Z.AI Agent</div>
           {/if}
           {#if msg.role === 'agent' || msg.role === 'thinking'}
             <div class="prose prose-invert prose-sm max-w-none">
@@ -425,7 +464,42 @@
             {msg.text}
           {/if}
         </div>
+        {/if}
       {/each}
+
+      {#if thoughts.length > 0 || isThinking}
+        <div class="p-2 rounded max-w-[90%] w-full bg-transparent text-ge-text-muted mr-auto">
+          <ChainOfThought.Root open={isThinking} defaultOpen={true}>
+            <ChainOfThought.Header />
+            <ChainOfThought.Content>
+              {#each thoughts as thought, i}
+                <ChainOfThought.Step
+                  label={stripImages(thought) || "Looking at image..."}
+                  status={i === thoughts.length - 1 && isThinking ? "active" : "complete"}
+                >
+                  {#each extractImages(thought) as img}
+                    <ChainOfThought.Image caption={img.alt}>
+                      <img src={img.url} alt={img.alt} class="w-full h-auto rounded" />
+                    </ChainOfThought.Image>
+                  {/each}
+                </ChainOfThought.Step>
+              {/each}
+
+              {#if toolCalls.length > 0}
+                <ChainOfThought.SearchResults class="mt-2">
+                  {#each toolCalls as call}
+                    <ChainOfThought.SearchResult>{call.name}: {call.input.length > 20 ? call.input.substring(0,20)+'...' : call.input}</ChainOfThought.SearchResult>
+                  {/each}
+                </ChainOfThought.SearchResults>
+              {/if}
+              {#if isThinking && thoughts.length === 0}
+
+                 <ChainOfThought.Step label="Initializing thought process..." status="active" />
+              {/if}
+            </ChainOfThought.Content>
+          </ChainOfThought.Root>
+        </div>
+      {/if}
     </div>
 
     <div class="flex flex-col gap-2 flex-shrink-0">
@@ -454,19 +528,19 @@
         </div>
       </div>
 
-      <div class="p-3 bg-ge-bg rounded-lg font-mono text-xs border border-ge-border flex justify-between items-center">
+      <div class="p-1 px-3 bg-ge-bg rounded-md font-mono text-[10px] border border-ge-border flex justify-between items-center">
         <span class="text-ge-text-muted flex items-center gap-2">
           <span class="relative flex h-2 w-2">
             {#if isGenerating || isUploading}
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-ge-accent opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-ge-accent"></span>
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-gradient-to-r from-red-700 to-orange-500 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-gradient-to-r from-red-700 to-orange-500"></span>
             {:else}
             <span class="relative inline-flex rounded-full h-2 w-2 bg-ge-success"></span>
             {/if}
           </span>
           Estimated Cost
         </span>
-        <span class="text-ge-success font-bold text-sm">${cost.toFixed(3)} USD</span>
+        <span class="text-ge-success font-bold text-xs">${cost.toFixed(3)} USD</span>
       </div>
 
       <div class="flex gap-2">
@@ -480,7 +554,7 @@
           <button
             on:click={generate}
             disabled={isGenerating || isUploading}
-            class="flex-grow bg-ge-accent text-ge-bg font-bold py-3 rounded-lg hover:bg-ge-accent-hover transition-colors shadow-lg hover:shadow-ge-accent/20 disabled:opacity-50 disabled:cursor-not-allowed">
+            class="flex-grow bg-gradient-to-r from-red-700 to-orange-500 text-ge-bg font-bold py-3 rounded-lg hover:opacity-90 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
             {isGenerating ? (isBatchMode ? 'Batching...' : 'Generating...') : (isBatchMode ? 'Schedule Batch' : 'Generate')}
           </button>
         {/if}
@@ -491,7 +565,7 @@
 
   <div class="flex-grow bg-ge-bg relative flex flex-col">
     <div class="h-12 border-b border-ge-border flex justify-between items-center px-4 bg-ge-card/50">
-      <div class="text-sm font-raleway font-bold">Preview Stage (RR Enabled)</div>
+      <div class="text-xs font-raleway font-bold">Preview Stage (RR Enabled)</div>
       <div class="flex gap-2">
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => window.print()}>Export PDF</button>
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => {

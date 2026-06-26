@@ -1,0 +1,18 @@
+INFO:     Started server process [628079]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:2828 (Press CTRL+C to quit)
+INFO:     127.0.0.1:34144 - "OPTIONS /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34156 - "POST /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57180 - "OPTIONS /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57194 - "POST /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47892 - "OPTIONS /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47908 - "POST /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54930 - "OPTIONS /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54946 - "POST /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60256 - "OPTIONS /command HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60268 - "POST /command HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [628079]
