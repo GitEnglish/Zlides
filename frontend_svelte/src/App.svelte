@@ -439,11 +439,11 @@ isThinking = false;
       </div>
 
       <div class="flex gap-2 mt-2">
-        <input type="number" bind:value={pageCount} min="1" max="20" class="bg-ge-bg border border-ge-border rounded px-2 py-1 w-20 text-ge-text outline-none" title="Page Count">
-        <select bind:value={slideLayout} class="bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text flex-grow outline-none">
-          <option value="">Layout: Auto</option>
-          <option value="title-content">Title+Content</option>
-          <option value="two-column">Two Column</option>
+        <input type="number" bind:value={pageCount} min="1" max="20" class="bg-ge-bg border border-ge-border rounded px-2 py-1 w-20 text-ge-text outline-none focus:border-ge-accent" title="Page Count">
+        <select bind:value={slideLayout} class="bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text flex-grow outline-none focus:border-ge-accent cursor-pointer">
+          <option value="" class="bg-ge-card text-ge-text">Layout: Auto</option>
+          <option value="title-content" class="bg-ge-card text-ge-text">Title+Content</option>
+          <option value="two-column" class="bg-ge-card text-ge-text">Two Column</option>
         </select>
       </div>
     </div>
@@ -503,16 +503,16 @@ isThinking = false;
     </div>
 
     <div class="flex flex-col gap-2 flex-shrink-0">
-      <div class="flex flex-col bg-ge-bg rounded-lg p-2 border border-ge-border relative neumorphic-inset h-24">
+      <div class="flex flex-col bg-ge-bg rounded-lg p-2.5 border border-ge-border neumorphic-inset min-h-[145px] flex-shrink-0">
         <textarea
           bind:value={promptText}
           on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } }}
           placeholder="Describe your vibe... (e.g. 'Turn this uploaded PDF into slides.')"
-          class="w-full h-full bg-transparent border-none outline-none resize-none p-1 text-ge-text placeholder:text-ge-text-muted/50 text-sm"
+          class="w-full flex-grow bg-transparent border-none outline-none resize-none p-1 text-ge-text placeholder:text-ge-text-muted/50 text-sm"
         ></textarea>
 
-        <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center bg-ge-bg/80 backdrop-blur rounded p-1">
-           <label class="cursor-pointer text-xs flex items-center gap-1 bg-ge-card px-3 py-1.5 rounded border border-ge-border hover:bg-ge-border transition-colors disabled:opacity-50" class:opacity-50={isUploading}>
+        <div class="flex justify-between items-center bg-ge-card rounded-md p-1.5 mt-2 border border-ge-border/30">
+           <label class="cursor-pointer text-xs flex items-center gap-1 bg-ge-bg px-3 py-1.5 rounded border border-ge-border hover:border-ge-accent hover:text-ge-accent transition-colors disabled:opacity-50" class:opacity-50={isUploading}>
              {#if isUploading}
                <span class="animate-spin h-3 w-3 border-2 border-ge-accent border-t-transparent rounded-full"></span>
              {:else}
