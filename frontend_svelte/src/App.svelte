@@ -531,7 +531,7 @@ isThinking = false;
     </div>
 
     <div class="flex flex-col gap-2 flex-shrink-0">
-      <div class="flex flex-col bg-ge-bg rounded-lg p-2.5 border border-ge-border neumorphic-inset min-h-[145px] flex-shrink-0">
+      <div class="flex flex-col bg-ge-bg rounded-lg p-2.5 border border-ge-border neumorphic-inset min-h-[220px] flex-shrink-0">
         <textarea
           bind:value={promptText}
           on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } }}
@@ -540,19 +540,18 @@ isThinking = false;
         ></textarea>
 
         <div class="flex justify-between items-center bg-ge-card rounded-md p-1.5 mt-2 border border-ge-border/30">
-           <label class="cursor-pointer text-xs flex items-center gap-1 bg-ge-bg px-3 py-1.5 rounded border border-ge-border hover:border-ge-accent hover:text-ge-accent transition-colors disabled:opacity-50" class:opacity-50={isUploading}>
+           <label class="cursor-pointer p-1.5 rounded bg-ge-bg hover:bg-ge-card hover:text-ge-accent hover:border-ge-accent/50 border border-ge-border transition-colors disabled:opacity-50 flex items-center justify-center" title="Ingest Document or Style Image" class:opacity-50={isUploading}>
              {#if isUploading}
-               <span class="animate-spin h-3 w-3 border-2 border-ge-accent border-t-transparent rounded-full"></span>
+               <span class="animate-spin h-4 w-4 border-2 border-ge-accent border-t-transparent rounded-full"></span>
              {:else}
-               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
              {/if}
-             Ingest Document / Style
              <input type="file" class="hidden" on:change={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" disabled={isUploading} />
            </label>
 
            <div class="flex items-center gap-2">
              {#if files}
-               <span class="text-xs text-ge-accent truncate max-w-[120px] mr-1" title={files[0].name}>{files[0].name}</span>
+               <span class="text-xs text-ge-accent truncate max-w-[200px] mr-1" title={files[0].name}>{files[0].name}</span>
              {/if}
              {#if isGenerating}
                <button on:click={stopRequest} class="bg-ge-danger text-ge-bg font-bold px-3 py-1.5 rounded text-xs hover:opacity-90 transition-all flex items-center gap-1">
