@@ -151,6 +151,119 @@ let currentController: AbortController | null = null;
   let pageCount = 5;
   let availableStyles: any[] = [];
 
+  let showStyleEditor = false;
+  let editingStyleId = "";
+  let editingStyleName = "";
+  let editingStylePromptHint = "";
+  let editingStyleBg = "#ffffff";
+  let editingStyleCard = "#f8f9fa";
+  let editingStyleText = "#1e293b";
+  let editingStyleAccent = "#2563eb";
+
+  async function openStyleEditor() {
+    if (selectedStyle === 'auto') return;
+    try {
+      status = "Loading style details...";
+      const resp = await fetch(`/styles/${selectedStyle}`);
+      if (!resp.ok) throw new Error("Failed to fetch style");
+      const style = await resp.json();
+
+      editingStyleId = style.id;
+      editingStyleName = style.name;
+      editingStylePromptHint = style.prompt_hint || "";
+      editingStyleBg = style.css?.bg || "#ffffff";
+      editingStyleCard = style.css?.card || "#f8f9fa";
+      editingStyleText = style.css?.text || "#1e293b";
+      editingStyleAccent = style.css?.accent || "#2563eb";
+
+      showStyleEditor = true;
+      status = "Ready";
+    } catch (e: any) {
+      status = "Error: " + e.message;
+    }
+  }
+
+  function createNewStyle() {
+    editingStyleId = `custom-style-${Date.now()}`;
+    editingStyleName = "My New Style";
+    editingStylePromptHint = "Use a modern typography with clean layout. Define appropriate CSS colors.";
+    editingStyleBg = "#ffffff";
+    editingStyleCard = "#f8f9fa";
+    editingStyleText = "#1e293b";
+    editingStyleAccent = "#2563eb";
+
+    showStyleEditor = true;
+  }
+
+  async function saveStyle() {
+    if (!editingStyleName.trim()) {
+      alert("Style Name cannot be empty.");
+      return;
+    }
+    try {
+      status = "Saving style pack...";
+      const stylePack = {
+        id: editingStyleId,
+        name: editingStyleName,
+        prompt_hint: editingStylePromptHint,
+        css: {
+          bg: editingStyleBg,
+          card: editingStyleCard,
+          text: editingStyleText,
+          accent: editingStyleAccent,
+          text_secondary: editingStyleText + "aa",
+          accent_hover: editingStyleAccent,
+          border: editingStyleText + "22",
+          success: "#16a34a",
+          danger: "#dc2626"
+        },
+        preview_colors: [editingStyleBg, editingStyleCard, editingStyleAccent, editingStyleText]
+      };
+
+      const resp = await fetch("/styles/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ style: stylePack })
+      });
+
+      if (!resp.ok) throw new Error("Save failed");
+
+      // Reload style list
+      const listResp = await fetch("/styles");
+      availableStyles = await listResp.json();
+
+      selectedStyle = editingStyleId;
+      showStyleEditor = false;
+      status = `Style "${editingStyleName}" saved successfully!`;
+    } catch (e: any) {
+      status = "Save failed: " + e.message;
+    }
+  }
+
+  async function deleteStyle() {
+    if (editingStyleId === 'auto') return;
+    if (!confirm(`Are you sure you want to delete the style "${editingStyleName}"?`)) return;
+
+    try {
+      status = "Deleting style...";
+      const resp = await fetch(`/styles/${editingStyleId}`, {
+        method: "DELETE"
+      });
+
+      if (!resp.ok) throw new Error("Delete failed");
+
+      // Reload style list
+      const listResp = await fetch("/styles");
+      availableStyles = await listResp.json();
+
+      selectedStyle = "auto";
+      showStyleEditor = false;
+      status = "Style deleted.";
+    } catch (e: any) {
+      status = "Delete failed: " + e.message;
+    }
+  }
+
 
   function extractImages(thought: string) {
     const images = [];
@@ -490,13 +603,23 @@ isThinking = false;
           </select>
         </div>
 
-        <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text-muted focus-within:border-ge-accent">
+        <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text-muted focus-within:border-ge-accent relative">
           <span class="text-[9px] font-mono uppercase font-bold tracking-wider select-none text-ge-text-muted/65">Style</span>
-          <select bind:value={selectedStyle} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 min-w-0">
+          <select bind:value={selectedStyle} class="bg-transparent border-none text-ge-text outline-none focus:outline-none focus:ring-0 cursor-pointer w-full text-xs p-0 pr-10 min-w-0">
             {#each availableStyles as style}
               <option value={style.id} class="bg-ge-card text-ge-text">{style.name}</option>
             {/each}
           </select>
+          <div class="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+            {#if selectedStyle !== 'auto'}
+              <button on:click={openStyleEditor} class="hover:text-ge-accent text-ge-text-muted hover:border-ge-accent text-[10px] p-0.5 bg-ge-card border border-ge-border rounded flex items-center justify-center h-5 w-5 pointer-events-auto transition-colors" title="Edit Style">
+                <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+            {/if}
+            <button on:click={createNewStyle} class="hover:text-ge-accent text-ge-text-muted hover:border-ge-accent text-[10px] p-0.5 bg-ge-card border border-ge-border rounded flex items-center justify-center h-5 w-5 pointer-events-auto transition-colors" title="New Style">
+              <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+          </div>
         </div>
 
         <div class="flex items-center gap-1 bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text-muted focus-within:border-ge-accent">
@@ -608,6 +731,76 @@ isThinking = false;
             </div>
         </div>
       </div>
+      {#if showStyleEditor}
+        <div class="absolute inset-0 bg-ge-card flex flex-col p-4 z-20 overflow-y-auto border-r border-ge-border">
+          <div class="flex items-center justify-between border-b border-ge-border pb-2 mb-3">
+            <h2 class="text-sm font-bold text-ge-accent font-raleway">Style Settings</h2>
+            <button on:click={() => showStyleEditor = false} class="text-ge-text-muted hover:text-ge-accent text-xs font-bold">Close</button>
+          </div>
+
+          <div class="flex flex-col gap-3 text-xs flex-grow">
+            <div class="flex flex-col gap-1">
+              <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Style ID</label>
+              <input type="text" bind:value={editingStyleId} disabled class="bg-ge-bg border border-ge-border rounded p-1.5 outline-none text-ge-text opacity-60 font-mono text-[10px]" />
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Style Name</label>
+              <input type="text" bind:value={editingStyleName} placeholder="e.g. GitEnglish Hub" class="bg-ge-bg border border-ge-border rounded p-1.5 outline-none text-ge-text focus:border-ge-accent" />
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">AI Prompt Hint</label>
+              <textarea bind:value={editingStylePromptHint} rows="4" placeholder="Instructions for the AI slide agent on colors, layouts..." class="bg-ge-bg border border-ge-border rounded p-1.5 outline-none text-ge-text resize-y focus:border-ge-accent placeholder:text-ge-text-muted/40 font-mono text-[11px]"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-1">
+              <div class="flex flex-col gap-1">
+                <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Background</label>
+                <div class="flex items-center gap-1.5">
+                  <input type="color" bind:value={editingStyleBg} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                  <input type="text" bind:value={editingStyleBg} class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-[10px]" />
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Card Background</label>
+                <div class="flex items-center gap-1.5">
+                  <input type="color" bind:value={editingStyleCard} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                  <input type="text" bind:value={editingStyleCard} class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-[10px]" />
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Text Color</label>
+                <div class="flex items-center gap-1.5">
+                  <input type="color" bind:value={editingStyleText} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                  <input type="text" bind:value={editingStyleText} class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-[10px]" />
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label class="text-[10px] font-mono uppercase tracking-wider text-ge-text-muted font-bold">Accent Color</label>
+                <div class="flex items-center gap-1.5">
+                  <input type="color" bind:value={editingStyleAccent} class="h-6 w-6 rounded border border-ge-border bg-transparent cursor-pointer p-0" />
+                  <input type="text" bind:value={editingStyleAccent} class="bg-ge-bg border border-ge-border rounded p-1 outline-none text-ge-text text-center w-full font-mono text-[10px]" />
+                </div>
+              </div>
+            </div>
+
+            <div class="flex gap-2 mt-auto pt-4 border-t border-ge-border">
+              {#if editingStyleId !== 'auto'}
+                <button on:click={deleteStyle} class="bg-ge-danger/10 hover:bg-ge-danger text-ge-danger hover:text-ge-bg font-bold py-2 px-3 rounded text-xs transition-all">
+                  Delete
+                </button>
+              {/if}
+              <button on:click={saveStyle} class="flex-grow bg-ge-accent text-ge-bg font-bold py-2 px-4 rounded text-xs hover:opacity-90 transition-all">
+                Save Style
+              </button>
+            </div>
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
 
