@@ -493,7 +493,19 @@
     <div class="h-12 border-b border-ge-border flex justify-between items-center px-4 bg-ge-card/50">
       <div class="text-sm font-raleway font-bold">Preview Stage (RR Enabled)</div>
       <div class="flex gap-2">
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => window.print()}>Export PDF</button>
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={async () => {
+          if (!slides.length) return;
+          const html = slides[currentSlideIndex].html;
+          try {
+            status = "Generating PDF...";
+            const { default: pdf } = await import('taepdf');
+            await pdf.download(html, 'A4', `slide_${currentSlideIndex + 1}.pdf`, undefined, { orientation: 'landscape' });
+            status = "Ready";
+          } catch (e: any) {
+            console.error("PDF generation failed:", e);
+            status = "PDF generation failed: " + (e?.message || String(e));
+          }
+        }}>Export PDF</button>
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => {
           if (!slides.length) return;
           const html = slides[currentSlideIndex].html;
