@@ -1,0 +1,6 @@
+{
+  "id": "guide",
+  "name": "Practical Guide",
+  "description": "Multi-chapter paginated guide document with cover, numbered cards, callouts, and ending page.",
+  "prompt": "Create a multi-chapter Practical Guide document for the provided topic. Use a dedicated cover page (.cover) with title and subtitle, chapter sections (.chapter-header), numbered cards (.numbered-card), key insight boxes (.tip-box), code/monospace blocks (.code-block), comparison tables (.compare-row), and an ending page (.ending)."
+}

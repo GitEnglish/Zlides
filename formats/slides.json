@@ -1,0 +1,6 @@
+{
+  "id": "slides",
+  "name": "Slides",
+  "description": "Multi-slide HTML presentation",
+  "prompt": "Create a multi-slide HTML presentation. Use <section> tags for each slide with page-break-after CSS. Include a title slide, content slides, and a closing slide as appropriate."
+}

@@ -1,0 +1,6 @@
+{
+  "id": "rr",
+  "name": "RegenResource",
+  "description": "Interactive learning resource with regenerate buttons",
+  "prompt": "Create an interactive HTML learning resource. You must identify specific content items (e.g. exercise questions, example sentences, vocabulary lists, practice prompts) that should be dynamic and refreshable. For each refreshable item, adhere to this strict HTML structural layout: (1) Wrap the entire item module in a parent container with the class 'card' or 'exercise-card'. (2) Inside that card, wrap the specific content block to be replaced in an inner container with class='question-item' or an id attribute ending in '-container' (e.g., id='sentence-1-container'). (3) Place a button with class='regenerate-btn' (or an id starting with 'regenerate') inside the card, containing a detailed data-prompt attribute specifying exactly how to regenerate that specific block of content. Do NOT inject script tags, inline onclick handlers, or styles that target parent layouts. Keep the HTML clean, semantic, and layout-agnostic so that the host portal can bind click listeners dynamically."
+}

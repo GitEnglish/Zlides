@@ -1,0 +1,6 @@
+{
+  "id": "worksheet",
+  "name": "Worksheet",
+  "description": "Interactive exercise worksheet",
+  "prompt": "Create an HTML worksheet with exercises, fill-in-the-blank, matching, or short answer sections. Include numbered exercises with clear instructions. Use HTML form elements (input, checkbox) for interactive fields but NO <script> tags — any interactivity must be CSS-only."
+}
