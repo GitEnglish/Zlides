@@ -34,8 +34,6 @@ saved_slides/
 
 node_modules
 frontend_svelte/node_modules
-public/
-patch_app.js
-patch_app2.js
-patch_app3.js
-test_pdf.js
+/public/
+*.pdf
+
