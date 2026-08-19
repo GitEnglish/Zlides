@@ -145,7 +145,7 @@ def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
             )
             css = style.get('css', {})
             if css:
-                base += "\n\nCRITICAL COLOR PALETTE INSTRUCTIONS:\n"
+                base += "\n\nCRITICAL INSTRUCTIONS:\n- DO NOT add @media print rules that override background colors (e.g. body { background: white !important }). The background color MUST be preserved exactly when printing.\n\nCRITICAL COLOR PALETTE INSTRUCTIONS:\n"
                 base += "You must explicitly use these exact hex colors in your inline CSS styling:\n"
                 for k, v in css.items():
                     base += f"- {k}: {v}\n"

@@ -16,6 +16,8 @@
   let isGenerating = false;
   let isBatchMode = false;
   let isUploading = false;
+  let isEditingHtml = false;
+  let editorHtml = '';
   let status = "Ready";
 
   let slides: any[] = [];
@@ -496,16 +498,45 @@
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={async () => {
           if (!slides.length) return;
           const html = slides[currentSlideIndex].html;
+          // Ensure exact color printing
+          const htmlWithPrint = html.replace("</style>", "\n@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }\n</style>");
           try {
             status = "Generating PDF...";
             const { default: pdf } = await import('taepdf');
-            await pdf.download(html, 'A4', `slide_${currentSlideIndex + 1}.pdf`, undefined, { orientation: 'landscape' });
+            await pdf.download(htmlWithPrint, 'A4', `slide_${currentSlideIndex + 1}.pdf`, 'fillable', { orientation: 'landscape' });
             status = "Ready";
           } catch (e: any) {
             console.error("PDF generation failed:", e);
             status = "PDF generation failed: " + (e?.message || String(e));
           }
         }}>Export PDF</button>
+
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => {
+          if (!slides.length) {
+            slides = [{ html: '<html><body><div class="p-8"><h1>Paste your HTML here</h1></div></body></html>' }];
+            currentSlideIndex = 0;
+          }
+          isEditingHtml = !isEditingHtml;
+          if (isEditingHtml) {
+            editorHtml = slides[currentSlideIndex].html;
+          } else {
+            slides[currentSlideIndex].html = editorHtml;
+            const combined = [editorHtml].join('')
+                .replace(/\\n/g, '\n').replace(/\\"/g, '"');
+            try {
+                const doc = iframeElement?.contentDocument;
+                if (doc && doc.body && doc.body.innerHTML.length > 0) {
+                    const prevScroll = doc.documentElement.scrollTop || doc.body.scrollTop;
+                    doc.body.innerHTML = combined;
+                    doc.documentElement.scrollTop = doc.body.scrollTop = prevScroll;
+                } else {
+                    iframeSrcDoc = combined;
+                }
+            } catch(e) {
+                iframeSrcDoc = combined;
+            }
+          }
+        }}>{isEditingHtml ? 'Apply HTML' : 'Edit / Paste HTML'}</button>
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => {
           if (!slides.length) return;
           const html = slides[currentSlideIndex].html;
@@ -521,6 +552,7 @@
 
     <div class="flex-grow p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
       <div class="w-full h-full max-w-5xl bg-white rounded shadow-2xl border border-ge-border overflow-hidden relative neumorphic" style="aspect-ratio: 16/9;">
+
         <iframe
           bind:this={iframeElement}
           title="Slide Preview"
@@ -528,6 +560,31 @@
           class="w-full h-full bg-white"
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         ></iframe>
+        {#if isEditingHtml}
+        <div class="absolute inset-0 bg-ge-bg z-10 flex flex-col">
+          <div class="p-2 bg-ge-card text-xs border-b border-ge-border flex justify-between items-center">
+            <span>Raw HTML Editor</span>
+            <button class="px-2 py-1 bg-ge-accent rounded text-ge-bg font-bold" on:click={() => {
+                isEditingHtml = false;
+                slides[currentSlideIndex].html = editorHtml;
+                const combined = [editorHtml].join('')
+                    .replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                try {
+                    const doc = iframeElement?.contentDocument;
+                    if (doc && doc.body) {
+                        doc.body.innerHTML = combined;
+                    } else {
+                        iframeSrcDoc = combined;
+                    }
+                } catch(e) {
+                    iframeSrcDoc = combined;
+                }
+            }}>Apply & Close</button>
+          </div>
+          <textarea bind:value={editorHtml} class="w-full flex-grow p-4 bg-[#1e1e1e] text-[#d4d4d4] font-mono text-sm resize-none focus:outline-none" placeholder="Paste your HTML here..."></textarea>
+        </div>
+        {/if}
+
       </div>
     </div>
 
