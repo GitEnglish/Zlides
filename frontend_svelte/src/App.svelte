@@ -17,6 +17,7 @@
   let isBatchMode = false;
   let isUploading = false;
   let isEditingHtml = false;
+  let isExportingPdf = false;
   let editorHtml = '';
   let status = "Ready";
 
@@ -29,7 +30,21 @@
   let files: FileList | null = null;
   let extractedMarkdown = "";
 
+  let availableFormats: any[] = [];
+  let availableLayouts: any[] = [];
+  let savedSlides: any[] = [];
+  let isSavedModalOpen = false;
+  let isLoadingSaved = false;
+  let savedSearchQuery = "";
+
   onMount(async () => {
+    // Warmup taepdf WASM engine in the background
+    try {
+      const { default: pdf } = await import('taepdf');
+      pdf.warmup().catch(err => console.warn("taepdf warmup background error:", err));
+    } catch (e) {
+      console.warn("Could not warmup taepdf:", e);
+    }
     // Load styles from the backend
     try {
       const resp = await fetch("/styles");
@@ -37,6 +52,25 @@
     } catch (e) {
       console.warn("Could not load styles:", e);
     }
+
+    // Load formats from the backend
+    try {
+      const resp = await fetch("/formats");
+      availableFormats = await resp.json();
+    } catch (e) {
+      console.warn("Could not load formats:", e);
+    }
+
+    // Load agnostic layouts from the backend
+    try {
+      const resp = await fetch("/layouts");
+      availableLayouts = await resp.json();
+    } catch (e) {
+      console.warn("Could not load layouts:", e);
+    }
+
+    // Load saved slides
+    loadSavedSlides();
 
     // Listen for RR format regeneration requests from the iframe
     window.addEventListener('message', (event) => {
@@ -50,6 +84,52 @@
       }
     });
   });
+
+  async function loadSavedSlides() {
+    isLoadingSaved = true;
+    try {
+      const resp = await fetch("/saved");
+      savedSlides = await resp.json();
+    } catch (e) {
+      console.warn("Could not load saved slides:", e);
+    } finally {
+      isLoadingSaved = false;
+    }
+  }
+
+  async function selectSavedSlide(slide: any) {
+    status = `Loading ${slide.title || slide.filename}...`;
+    try {
+      const resp = await fetch('/saved/' + encodeURIComponent(slide.filename));
+      const html = await resp.text();
+      slides = [{ html, title: slide.title || slide.filename }];
+      currentSlideIndex = 0;
+      iframeSrcDoc = html;
+      isSavedModalOpen = false;
+      status = `Loaded: ${slide.title || slide.filename}`;
+      addMessage(`[Loaded Saved Slide] **${slide.title || slide.filename}** (${slide.date})`, 'agent');
+    } catch (err: any) {
+      status = `Failed to load slide: ${err.message}`;
+    }
+  }
+
+  $: filteredSavedSlides = savedSlides.filter(s => {
+    if (!savedSearchQuery.trim()) return true;
+    const q = savedSearchQuery.toLowerCase();
+    return (s.title && s.title.toLowerCase().includes(q)) ||
+           (s.filename && s.filename.toLowerCase().includes(q)) ||
+           (s.date && s.date.toLowerCase().includes(q));
+  });
+
+  $: formatList = availableFormats.length > 0 ? availableFormats : [
+    { id: "slides", name: "Slides" },
+    { id: "guide", name: "Guide" },
+    { id: "lac", name: "LAC v5" },
+    { id: "poster", name: "Poster" },
+    { id: "worksheet", name: "Worksheet" },
+    { id: "report", name: "Report" },
+    { id: "rr", name: "RegenResource" }
+  ];
 
   async function updateCost() {
     if (!promptText.trim() && !files) {
@@ -116,7 +196,7 @@
   let chatMessages: any[] = [{ role: "agent", text: "Ready! Pick a format + style, describe what you want." }];
   let selectedFormat = "slides";
   let selectedStyle = "auto";
-  let pageCount = 5;
+  let pageCount: number | null = null;
   let slideLayout = "";
   let availableStyles: any[] = [];
 
@@ -196,7 +276,7 @@
           message: textToSend + (extractedMarkdown ? "\n\n" + extractedMarkdown : ""),
           format: selectedFormat,
           style: selectedStyle,
-          page_count: pageCount,
+          page_count: pageCount ? Number(pageCount) : undefined,
           layout: slideLayout,
         }),
         signal: currentController.signal
@@ -367,13 +447,23 @@
 
   <div class="w-full md:w-1/3 p-6 flex flex-col gap-4 bg-ge-card border-r border-ge-border shadow-2xl z-10 flex-shrink-0 relative overflow-hidden">
     <div class="space-y-2 flex-shrink-0">
-      <div class="flex items-center gap-2">
-        <h1 class="text-3xl font-bold tracking-tight text-ge-accent font-raleway">Zlides V2</h1>
-        {#if isBatchMode}
-          <span class="bg-ge-bg text-xs px-2 py-1 rounded border border-ge-border text-ge-accent animate-pulse">Batch Mode</span>
-        {:else}
-          <span class="bg-ge-bg text-xs px-2 py-1 rounded border border-ge-border text-ge-text-muted">Mongoose Fast</span>
-        {/if}
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <h1 class="text-3xl font-bold tracking-tight text-ge-accent font-raleway">Zlides V2</h1>
+          {#if isBatchMode}
+            <span class="bg-ge-bg text-xs px-2 py-1 rounded border border-ge-border text-ge-accent animate-pulse">Batch Mode</span>
+          {:else}
+            <span class="bg-ge-bg text-xs px-2 py-1 rounded border border-ge-border text-ge-text-muted">Mongoose Fast</span>
+          {/if}
+        </div>
+        <button
+          class="text-xs px-3 py-1.5 bg-ge-bg border border-ge-border hover:border-ge-accent rounded-lg text-ge-accent font-medium transition-colors flex items-center gap-1.5 shadow-sm"
+          on:click={() => { isSavedModalOpen = true; loadSavedSlides(); }}
+          title="Browse and select saved slides and past classes"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+          Past Classes ({savedSlides.length})
+        </button>
       </div>
       <p class="text-ge-text-muted text-sm">Drop vibes. Get slides. The smart parser extracts layout + style from uploaded files.</p>
     </div>
@@ -381,12 +471,13 @@
     <!-- UI Controls -->
     <div class="flex flex-col gap-2 flex-shrink-0 text-sm">
       <div class="flex gap-2 flex-wrap">
-        {#each ["slides", "poster", "worksheet", "report", "rr"] as fmt}
+        {#each formatList as fmt}
           <button
-            class="px-3 py-1 rounded-full border border-ge-border transition-colors {selectedFormat === fmt ? 'bg-ge-accent text-ge-bg font-bold border-ge-accent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
-            on:click={() => selectedFormat = fmt}
+            class="px-3 py-1 rounded-full border border-ge-border transition-colors text-xs {selectedFormat === fmt.id ? 'bg-ge-accent text-ge-bg font-bold border-ge-accent' : 'bg-ge-bg text-ge-text hover:bg-ge-border'}"
+            title={fmt.description || fmt.name}
+            on:click={() => selectedFormat = fmt.id}
           >
-            {fmt}
+            {fmt.name || fmt.id}
           </button>
         {/each}
       </div>
@@ -403,11 +494,12 @@
       </div>
 
       <div class="flex gap-2 mt-2">
-        <input type="number" bind:value={pageCount} min="1" max="20" class="bg-ge-bg border border-ge-border rounded px-2 py-1 w-20 text-ge-text outline-none" title="Page Count">
-        <select bind:value={slideLayout} class="bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text flex-grow outline-none">
+        <input type="number" bind:value={pageCount} min="1" max="20" placeholder="Pages: Auto" class="bg-ge-bg border border-ge-border rounded px-2 py-1 w-24 text-ge-text placeholder:text-ge-text-muted/60 outline-none text-xs" title="Page Count (Leave blank for automatic page count)">
+        <select bind:value={slideLayout} class="bg-ge-bg border border-ge-border rounded px-2 py-1 text-ge-text flex-grow outline-none text-xs" title="Agnostic Layout Matrix">
           <option value="">Layout: Auto</option>
-          <option value="title-content">Title+Content</option>
-          <option value="two-column">Two Column</option>
+          {#each availableLayouts as l}
+            <option value={l.id}>{l.name} ({l.id})</option>
+          {/each}
         </select>
       </div>
     </div>
@@ -493,23 +585,80 @@
 
   <div class="flex-grow bg-ge-bg relative flex flex-col">
     <div class="h-12 border-b border-ge-border flex justify-between items-center px-4 bg-ge-card/50">
-      <div class="text-sm font-raleway font-bold">Preview Stage (RR Enabled)</div>
+      <div class="flex items-center gap-3">
+        <div class="text-sm font-raleway font-bold">Preview Stage (RR Enabled)</div>
+        <button
+          class="text-xs px-2.5 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border text-ge-accent transition-colors flex items-center gap-1.5"
+          on:click={() => { isSavedModalOpen = true; loadSavedSlides(); }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+          Past Classes ({savedSlides.length})
+        </button>
+      </div>
       <div class="flex gap-2">
-        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={async () => {
-          if (!slides.length) return;
-          const html = slides[currentSlideIndex].html;
-          // Ensure exact color printing
-          const htmlWithPrint = html.replace("</style>", "\n@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }\n</style>");
-          try {
+        <button
+          disabled={isExportingPdf || !slides.length}
+          class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors disabled:opacity-50"
+          on:click={async () => {
+            if (!slides.length || isExportingPdf) return;
+            isExportingPdf = true;
             status = "Generating PDF...";
-            const { default: pdf } = await import('taepdf');
-            await pdf.download(htmlWithPrint, 'A4', `slide_${currentSlideIndex + 1}.pdf`, 'fillable', { orientation: 'landscape' });
-            status = "Ready";
-          } catch (e: any) {
-            console.error("PDF generation failed:", e);
-            status = "PDF generation failed: " + (e?.message || String(e));
-          }
-        }}>Export PDF</button>
+            try {
+              const html = slides[currentSlideIndex].html;
+              const { default: pdf } = await import('taepdf');
+              await pdf.warmup();
+
+              // 1. Strip any legacy @media print blocks that force white backgrounds
+              let exportHtml = html.replace(/@media\s+print\s*\{[\s\S]*?\}\s*\}/gi, '');
+
+              // 2. Resolve SVGs so stroke/fill attributes are explicit for isolated rendering
+              exportHtml = exportHtml.replace(/<svg\b([^>]*)>/gi, (match, attrs) => {
+                let updated = attrs;
+                if (!updated.includes('stroke=')) updated += ' stroke="#ff6b35"';
+                if (!updated.includes('fill=')) updated += ' fill="none"';
+                if (!updated.includes('stroke-width=')) updated += ' stroke-width="2"';
+                return `<svg${updated}>`;
+              });
+
+              // 3. Inject font-face rules, block-level container flow, and card break protection
+              const baseEnhancementsCss = `
+                @font-face{font-family:'Inter';src:url('/fonts/inter.woff2') format('woff2');font-weight:100 900;font-style:normal;}
+                @font-face{font-family:'Roboto';src:url('/fonts/roboto.woff2') format('woff2');font-weight:100 900;font-style:normal;}
+                @font-face{font-family:'Outfit';src:url('/fonts/outfit.woff2') format('woff2');font-weight:100 900;font-style:normal;}
+                @font-face{font-family:'Raleway';src:url('/fonts/raleway.woff2') format('woff2');font-weight:100 900;font-style:normal;}
+                
+                .container, main, .page {
+                  display: block !important;
+                  background: #0f1112 !important;
+                  color: #e5e7eb !important;
+                  min-height: 100% !important;
+                }
+                .card, .summary-box, .section, .section-head, .header-row, .stats-row, .exercise, tr {
+                  break-inside: avoid !important;
+                  page-break-inside: avoid !important;
+                }
+              `;
+
+              if (exportHtml.includes('<style>')) {
+                exportHtml = exportHtml.replace('<style>', `<style>\n${baseEnhancementsCss}\n`);
+              } else if (exportHtml.includes('</head>')) {
+                exportHtml = exportHtml.replace('</head>', `<style>\n${baseEnhancementsCss}\n</style>\n</head>`);
+              } else {
+                exportHtml = `<style>\n${baseEnhancementsCss}\n</style>\n` + exportHtml;
+              }
+
+              const isPortrait = selectedFormat === 'worksheet' || selectedFormat === 'report' || selectedFormat === 'guide' || selectedFormat === 'poster';
+              const orientation = isPortrait ? 'portrait' : 'landscape';
+
+              await pdf.download(exportHtml, 'A4', `slide_${currentSlideIndex + 1}.pdf`, 'fillable', { orientation });
+              status = "Ready";
+            } catch (e: any) {
+              console.error("PDF generation failed:", e);
+              status = "PDF generation failed: " + (e?.message || String(e));
+            } finally {
+              isExportingPdf = false;
+            }
+        }}>{isExportingPdf ? 'Exporting...' : 'Export PDF'}</button>
 
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => {
           if (!slides.length) {
@@ -596,11 +745,97 @@
       >Prev</button>
       <span class="text-sm font-mono text-ge-text-muted">Slide {slides.length ? currentSlideIndex + 1 : 0} of {slides.length}</span>
       <button
-        class="px-4 py-1.5 rounded border border-ge-border bg-ge-bg hover:bg-ge-border transition-colors disabled:opacity-50"
+        class="px-4 py-1.5 rounded border border-ge-border bg-ge-border hover:bg-ge-border transition-colors disabled:opacity-50"
         disabled={slides.length === 0 || currentSlideIndex >= slides.length - 1}
         on:click={() => { if (currentSlideIndex < slides.length - 1) { currentSlideIndex++; iframeSrcDoc = slides[currentSlideIndex].html; } }}
       >Next</button>
     </div>
   </div>
+
+  <!-- Saved Slides / Past Classes Modal -->
+  {#if isSavedModalOpen}
+  <div class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-ge-card border border-ge-border rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="p-4 border-b border-ge-border flex justify-between items-center bg-ge-bg">
+        <div class="flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-ge-accent"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+          <h2 class="text-lg font-bold font-raleway text-ge-text">Past Classes & Saved Slides</h2>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-ge-border text-ge-text-muted font-mono">{filteredSavedSlides.length} items</span>
+        </div>
+        <button
+          class="text-ge-text-muted hover:text-ge-text p-1.5 rounded-lg hover:bg-ge-border transition-colors"
+          on:click={() => isSavedModalOpen = false}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="p-4 border-b border-ge-border bg-ge-card flex gap-3 items-center">
+        <div class="relative flex-grow">
+          <input
+            type="text"
+            bind:value={savedSearchQuery}
+            placeholder="Search classes, lessons, topics, or dates..."
+            class="w-full bg-ge-bg border border-ge-border rounded-lg px-3 py-2 pl-9 text-sm text-ge-text placeholder:text-ge-text-muted/50 focus:border-ge-accent outline-none"
+          />
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-3 text-ge-text-muted/60"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <button
+          class="px-3 py-2 text-xs bg-ge-bg border border-ge-border rounded-lg hover:bg-ge-border text-ge-text transition-colors flex items-center gap-1.5"
+          on:click={loadSavedSlides}
+          disabled={isLoadingSaved}
+        >
+          <span class:animate-spin={isLoadingSaved}>↻</span>
+          Refresh
+        </button>
+      </div>
+
+      <div class="flex-grow overflow-y-auto p-4 space-y-2 max-h-[55vh]">
+        {#if isLoadingSaved && savedSlides.length === 0}
+          <div class="text-center py-12 text-ge-text-muted text-sm flex flex-col items-center gap-2">
+            <span class="animate-spin h-5 w-5 border-2 border-ge-accent border-t-transparent rounded-full"></span>
+            Loading saved classes...
+          </div>
+        {:else if filteredSavedSlides.length === 0}
+          <div class="text-center py-12 text-ge-text-muted text-sm">
+            {savedSearchQuery ? `No saved slides matching "${savedSearchQuery}"` : 'No saved slides found in saved_slides/'}
+          </div>
+        {:else}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            {#each filteredSavedSlides as slide}
+              <button
+                class="text-left p-3.5 rounded-lg border border-ge-border bg-ge-bg hover:border-ge-accent hover:bg-ge-card transition-all group flex flex-col justify-between"
+                on:click={() => selectSavedSlide(slide)}
+              >
+                <div>
+                  <div class="font-medium text-sm text-ge-text group-hover:text-ge-accent line-clamp-2 transition-colors">
+                    {slide.title}
+                  </div>
+                  <div class="text-xs text-ge-text-muted/70 truncate mt-1 font-mono">
+                    {slide.filename}
+                  </div>
+                </div>
+                <div class="flex items-center justify-between mt-3 text-xs text-ge-text-muted border-t border-ge-border/50 pt-2">
+                  <span>{slide.date} • {(slide.size / 1024).toFixed(1)} KB</span>
+                  <span class="text-ge-accent font-medium group-hover:underline">Load Slide →</span>
+                </div>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <div class="p-3 bg-ge-bg border-t border-ge-border flex justify-between items-center text-xs text-ge-text-muted">
+        <span>Click any past class to load it directly into the preview stage.</span>
+        <button
+          class="px-4 py-1.5 bg-ge-card border border-ge-border rounded hover:bg-ge-border text-ge-text transition-colors"
+          on:click={() => isSavedModalOpen = false}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+  {/if}
 
 </main>

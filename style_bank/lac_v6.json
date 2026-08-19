@@ -1,0 +1,32 @@
+{
+  "id": "lac_v6",
+  "name": "LAC v6 Editorial",
+  "created_at": "2026-08-19",
+  "brand_png": "gitenglish-brand.png",
+  "preview_colors": [
+    "#0f1112",
+    "#16181a",
+    "#ff6b35",
+    "#e5e7eb"
+  ],
+  "prompt_hint": "Follow the LAC v6 visual design system. Use a dark theme with background #0f1112 and radial gradient ellipse 80% 40% at 50% -10% with rgba(255, 107, 53, 0.07), surface/card background #16181a, borders/lines #2e3236, text color #e5e7eb, muted #9ca3af, brand accent #ff6b35 (burnt mandarin), deep brand #7e1500, common mistake amber #f0b23e, another way teal #4fb3a9. Typography: Fraunces serif for h1 lesson title and summary narrative ONLY; Raleway bold sans-serif for h2 section headers and h3 card titles; Inter for general body copy; JetBrains Mono for metadata, counts, pos tags, rank badges, and kv tags. Section accents: vocabulary #447F9F, phrasal-verbs #3B8484, collocations #DE6E55, grammar #B06D29, idioms-and-phrases #62193D, focus-points #DCE62C, in-class-practice #b98cf0, self-study #6fc3df, tutor-todos #9ca3af. Cards have a 3px left border with linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 42%, #000)). Labeled rows (.kv): .kv.alt ('Another way', teal), .kv.example ('Example 1', 'Example 2', orange), .kv.mistake ('Common mistake', amber). Auto section numbers via CSS counter. No font below 13px. All CSS must be inline in a <style> tag. No CDN scripts.",
+  "css": {
+    "bg": "#0f1112",
+    "card": "#16181a",
+    "text": "#e5e7eb",
+    "text_secondary": "#9ca3af",
+    "accent": "#ff6b35",
+    "accent_hover": "#ff8555",
+    "border": "#2e3236",
+    "success": "#4fb3a9",
+    "danger": "#f0b23e"
+  },
+  "fonts": {
+    "display": "'Fraunces', Georgia, serif",
+    "heading": "'Raleway', sans-serif",
+    "body": "'Inter', sans-serif",
+    "mono": "'JetBrains Mono', monospace"
+  },
+  "card_style": "left-accent-border",
+  "print_css": "@media print { * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } @page { margin: 1.5cm; size: A4; } button[id='regenerate'] { display: none !important; } }"
+}

@@ -1,0 +1,135 @@
+{
+  "LAC_LAYOUT": {
+    "format_type": "fluid_vertical_stack",
+    "rendering_targets": ["web_embed", "desktop_browser", "tablet", "phone"],
+    "_contract": "Anchors are EXACT key names from the LAC JSON schema (SKILL.md Phase 8). This file maps keys to layout slots only. It contains no content instructions — the HTML agent receives completed JSON and fills slots; it never generates content.",
+    "matrix_blocks": [
+      {
+        "id": "HEADER_BLOCK",
+        "structure": "HEADER_ROW",
+        "fields": ["title", "sessionDate", "studentName"],
+        "item_layout_flow": [
+          { "line_layer_1": { "display": "HORIZONTAL_ROW_SPLIT", "left_anchor": "title", "right_anchor": "sessionDate" } }
+        ]
+      },
+      {
+        "id": "SUMMARY_BLOCK",
+        "structure": "LABELED_SUMMARY_BOX",
+        "fields": ["summary"]
+      },
+      {
+        "id": "VOCABULARY_BLOCK",
+        "structure": "GRID_MATRIX_CARDS",
+        "grid_rule": "columns scale by width tier (single / two / three) — never 4 wide; breakpoints owned by template",
+        "fields": ["vocabulary"],
+        "loop_structure": {
+          "item_layout_flow": [
+            { "line_layer_1": { "display": "HORIZONTAL_ROW_SPLIT", "left_anchor": "item", "right_anchor": ["pos", "exact_coca_rank"] } },
+            { "line_layer_2": { "display": "VERTICAL_BLOCK", "anchor": "core_definition" } }
+          ]
+        }
+      },
+      {
+        "id": "PHRASAL_VERBS_BLOCK",
+        "structure": "CARD_LIST",
+        "fields": ["phrasalVerbs"],
+        "loop_structure": {
+          "item_layout_flow": [
+            { "line_layer_1": { "display": "HORIZONTAL_ROW_SPLIT", "left_anchor": "item", "right_anchor": ["latinateSynonym", "usagePercentVsLatinate"] } },
+            { "line_layer_2": { "display": "VERTICAL_ARRAY_STACK", "anchor": "impact" } }
+          ]
+        }
+      },
+      {
+        "id": "COLLOCATIONS_BLOCK",
+        "structure": "CARD_LIST",
+        "fields": ["collocations"],
+        "loop_structure": {
+          "item_layout_flow": [
+            { "line_layer_1": { "display": "VERTICAL_BLOCK", "anchor": "item" } },
+            { "line_layer_2": { "display": "VERTICAL_ARRAY_STACK", "anchor": "details" } }
+          ]
+        }
+      },
+      {
+        "id": "GRAMMAR_BLOCK",
+        "structure": "FULL_WIDTH_LABELED_CARDS",
+        "fields": ["grammar"],
+        "loop_structure": {
+          "item_layout_flow": [
+            { "line_layer_1": { "display": "VERTICAL_BLOCK", "anchor": "item" } },
+            { "line_layer_2": { "display": "VERTICAL_ARRAY_STACK", "anchor": "details" } },
+            { "line_layer_3": { "display": "LABELED_ROW", "tag": "ALT", "anchor": "second_alternative" } },
+            { "line_layer_4": { "display": "LABELED_ROW", "tag": "EX", "anchor": "logical_example_1" } },
+            { "line_layer_5": { "display": "LABELED_ROW", "tag": "EX", "anchor": "logical_example_2" } },
+            { "line_layer_6": { "display": "LABELED_ROW", "tag": "TRAP", "anchor": "avoid_this_trap" } }
+          ]
+        }
+      },
+      {
+        "id": "IDIOMS_AND_PHRASES_BLOCK",
+        "structure": "CARD_LIST",
+        "fields": ["idiomsAndPhrases"],
+        "loop_structure": {
+          "item_layout_flow": [
+            { "line_layer_1": { "display": "HORIZONTAL_ROW_SPLIT", "left_anchor": "item", "right_anchor": "register" } },
+            { "line_layer_2": { "display": "VERTICAL_ARRAY_STACK", "anchor": "details" } },
+            { "line_layer_3": { "display": "LABELED_ROW", "tag": "MEANING", "anchor": "implicitMeaning" } }
+          ]
+        }
+      },
+      {
+        "id": "FOCUS_POINTS_BLOCK",
+        "structure": "FULL_WIDTH_CALLOUT_CARDS",
+        "fields": ["focusPoints"],
+        "loop_structure": {
+          "item_layout_flow": [
+            { "line_layer_1": { "display": "VERTICAL_BLOCK", "anchor": "item" } },
+            { "line_layer_2": { "display": "VERTICAL_ARRAY_STACK", "anchor": "details" } }
+          ]
+        }
+      },
+      {
+        "id": "IN_CLASS_PRACTICE_BLOCK",
+        "structure": "CARD_LIST",
+        "fields": ["inClassPractice"],
+        "loop_structure": {
+          "_note": "items are plain strings; each activity is 3 consecutive strings: [scenario, framing, constraints]",
+          "item_layout_flow": [
+            { "line_layer_1": { "display": "VERTICAL_BLOCK", "anchor": "item" } }
+          ]
+        }
+      },
+      {
+        "id": "SELF_STUDY_BLOCK",
+        "structure": "CARD_LIST",
+        "fields": ["selfStudy"],
+        "loop_structure": {
+          "_note": "items are plain strings; each task is 3 consecutive strings: [objective, framing, constraints]",
+          "item_layout_flow": [
+            { "line_layer_1": { "display": "VERTICAL_BLOCK", "anchor": "item" } }
+          ]
+        }
+      },
+      {
+        "id": "ACTION_ITEMS_BLOCK",
+        "structure": "TWO_COLUMN_CHECKLIST",
+        "fields": ["studentActionItems", "teacherActionItems"],
+        "loop_structure": {
+          "item_layout_flow": [
+            { "line_layer_1": { "display": "VERTICAL_ARRAY_STACK", "anchor": "studentActionItems" } },
+            { "line_layer_2": { "display": "VERTICAL_ARRAY_STACK", "anchor": "teacherActionItems" } }
+          ]
+        }
+      },
+      {
+        "id": "FOOTER_BLOCK",
+        "structure": "METADATA_ANCHOR_ROW",
+        "fields": ["footer", "sourceFile"],
+        "formatting_rules": {
+          "inner_layout": "SPACE_BETWEEN"
+        }
+      }
+    ]
+  }
+}

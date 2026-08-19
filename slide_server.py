@@ -22,9 +22,20 @@ SAVED_SLIDES_DIR = "saved_slides"
 SESSION_FILE = "session.json"
 STYLE_BANK_DIR = Path("style_bank")
 ASSETS_DIR = Path("assets")
+LAYOUTS_FILE = Path("layouts.json")
 
 os.makedirs(SAVED_SLIDES_DIR, exist_ok=True)
 os.makedirs(STYLE_BANK_DIR, exist_ok=True)
+
+
+def load_layouts() -> dict:
+    """Load layout definitions from layouts.json."""
+    if LAYOUTS_FILE.exists():
+        try:
+            return json.loads(LAYOUTS_FILE.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"[Layouts] Failed to load {LAYOUTS_FILE}: {e}")
+    return {}
 
 
 def estimate_cost(input_tokens: int, output_tokens: int, model: str = "glm-4.5") -> float:
@@ -51,14 +62,95 @@ app.add_middleware(
 
 # Mount the new Svelte compiled frontend
 app.mount("/assets", StaticFiles(directory="public/assets"), name="assets")
+if Path("public/fonts").exists():
+    app.mount("/fonts", StaticFiles(directory="public/fonts"), name="fonts")
 
-FORMATS = {
-    "slides": "Create a multi-slide HTML presentation. Use <section> tags for each slide with page-break-after CSS. Include a title slide, content slides, and a closing slide as appropriate.",
-    "poster": "Create a single-page HTML poster. Everything visible on one screen/page. Eye-catching, visual, information-dense.",
-    "worksheet": "Create an HTML worksheet with exercises, fill-in-the-blank, matching, or short answer sections. Include numbered exercises with clear instructions. Use HTML form elements (input, checkbox) for interactive fields but NO <script> tags — any interactivity must be CSS-only.",
-    "report": "Create an HTML document/report. Structured with headings, paragraphs, lists, and tables as needed. Professional document layout suitable for printing.",
-    "rr": "Create an HTML learning resource. Where content can be regenerated (exercises, example sentences, vocabulary lists, practice questions), place <button id='regenerate' data-prompt='SPECIFIC regeneration instruction here'> with a clear label. Do NOT put regenerate buttons on static content like instructions or explanations — only where it makes pedagogical sense to generate new variants. Add inline styles for .regenerate-btn.",
+FORMATS_DIR = Path("formats")
+
+DEFAULT_FORMATS = {
+    "slides": {
+        "id": "slides",
+        "name": "Slides",
+        "description": "Create a multi-slide HTML presentation. Use <section> tags for each slide with page-break-after CSS. Include a title slide, content slides, and a closing slide as appropriate.",
+        "prompt": "Create a multi-slide HTML presentation. Use <section> tags for each slide with page-break-after CSS. Include a title slide, content slides, and a closing slide as appropriate."
+    },
+    "poster": {
+        "id": "poster",
+        "name": "Poster",
+        "description": "Create a single-page HTML poster. Everything visible on one screen/page. Eye-catching, visual, information-dense.",
+        "prompt": "Create a single-page HTML poster. Everything visible on one screen/page. Eye-catching, visual, information-dense."
+    },
+    "worksheet": {
+        "id": "worksheet",
+        "name": "Worksheet",
+        "description": "Create an HTML worksheet with exercises, fill-in-the-blank, matching, or short answer sections. Include numbered exercises with clear instructions. Use HTML form elements (input, checkbox) for interactive fields but NO <script> tags — any interactivity must be CSS-only.",
+        "prompt": "Create an HTML worksheet with exercises, fill-in-the-blank, matching, or short answer sections. Include numbered exercises with clear instructions. Use HTML form elements (input, checkbox) for interactive fields but NO <script> tags — any interactivity must be CSS-only."
+    },
+    "report": {
+        "id": "report",
+        "name": "Report",
+        "description": "Create an HTML document/report. Structured with headings, paragraphs, lists, and tables as needed. Professional document layout suitable for printing.",
+        "prompt": "Create an HTML document/report. Structured with headings, paragraphs, lists, and tables as needed. Professional document layout suitable for printing."
+    },
+    "rr": {
+        "id": "rr",
+        "name": "RegenResource",
+        "description": "Create an HTML learning resource. Where content can be regenerated (exercises, example sentences, vocabulary lists, practice questions), place <button id='regenerate' data-prompt='SPECIFIC regeneration instruction here'> with a clear label. Do NOT put regenerate buttons on static content like instructions or explanations — only where it makes pedagogical sense to generate new variants. Add inline styles for .regenerate-btn.",
+        "prompt": "Create an HTML learning resource. Where content can be regenerated (exercises, example sentences, vocabulary lists, practice questions), place <button id='regenerate' data-prompt='SPECIFIC regeneration instruction here'> with a clear label. Do NOT put regenerate buttons on static content like instructions or explanations — only where it makes pedagogical sense to generate new variants. Add inline styles for .regenerate-btn."
+    }
 }
+
+def load_formats() -> dict:
+    """Load all formats from formats/ directory, with default fallbacks."""
+    formats = {k: dict(v) for k, v in DEFAULT_FORMATS.items()}
+    if FORMATS_DIR.exists():
+        for f in FORMATS_DIR.glob("*.json"):
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                fmt_id = data.get("id") or f.stem
+                formats[fmt_id] = {
+                    "id": fmt_id,
+                    "name": data.get("name", fmt_id),
+                    "description": data.get("description", ""),
+                    "prompt": data.get("prompt") or data.get("description", "")
+                }
+            except Exception as e:
+                print(f"[Formats] Failed to load {f}: {e}")
+    return formats
+
+class FormatsDict(dict):
+    """Dynamic dict wrapper so FORMATS.get() or FORMATS[...] always loads fresh formats."""
+    def __getitem__(self, key):
+        formats = load_formats()
+        if key in formats:
+            return formats[key]["prompt"]
+        return DEFAULT_FORMATS.get(key, DEFAULT_FORMATS["slides"])["prompt"]
+
+    def get(self, key, default=None):
+        formats = load_formats()
+        if key in formats:
+            return formats[key]["prompt"]
+        if default is not None:
+            return default
+        return DEFAULT_FORMATS.get("slides")["prompt"]
+
+    def items(self):
+        formats = load_formats()
+        return [(k, v["prompt"]) for k, v in formats.items()]
+
+    def keys(self):
+        formats = load_formats()
+        return formats.keys()
+
+    def values(self):
+        formats = load_formats()
+        return [v["prompt"] for v in formats.values()]
+
+    def __contains__(self, key):
+        formats = load_formats()
+        return key in formats
+
+FORMATS = FormatsDict()
 
 
 
@@ -145,7 +237,7 @@ def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
             )
             css = style.get('css', {})
             if css:
-                base += "\n\nCRITICAL INSTRUCTIONS:\n- DO NOT add @media print rules that override background colors (e.g. body { background: white !important }). The background color MUST be preserved exactly when printing.\n\nCRITICAL COLOR PALETTE INSTRUCTIONS:\n"
+                base += "\n\nCRITICAL COLOR PALETTE INSTRUCTIONS:\n"
                 base += "You must explicitly use these exact hex colors in your inline CSS styling:\n"
                 for k, v in css.items():
                     base += f"- {k}: {v}\n"
@@ -437,8 +529,25 @@ async def version():
 
 @app.get("/formats")
 async def list_formats():
-    """List available formats."""
-    return [{"id": k, "description": v[:80]} for k, v in FORMATS.items()]
+    """List available formats with metadata."""
+    formats = load_formats()
+    return [{"id": v["id"], "name": v.get("name", v["id"]), "description": v.get("description", "")[:120]} for v in formats.values()]
+
+
+@app.get("/layouts")
+async def list_layouts():
+    """List available layouts defined in layouts.json."""
+    layouts = load_layouts()
+    result = []
+    for k, v in layouts.items():
+        if isinstance(v, dict):
+            name = k.replace("_", " ").title()
+            fmt = v.get("format_type", "")
+            desc = f"{fmt} (Agnostic Matrix)" if fmt else "Agnostic Matrix Layout"
+            result.append({"id": k, "name": name, "description": desc, "format_type": fmt})
+        else:
+            result.append({"id": k, "name": k, "description": ""})
+    return result
 
 
 # ── Style Bank Endpoints ─────────────────────────────────────────────────────
@@ -572,16 +681,29 @@ async def send_command(request: ChatRequest):
 
     # Page count instruction
     page_instruction = ""
-    effective_page_count = request.page_count or 5
-    page_instruction = f"\nCRITICAL: MUST create exactly {effective_page_count} {'slides' if request.format == 'slides' else 'sections'}."
-    if request.layout:
-        page_instruction += f" Layout preference: {request.layout}."
+    if request.page_count:
+        page_instruction = f"\nCRITICAL: MUST create exactly {request.page_count} {'slides' if request.format == 'slides' else 'sections'}."
+
+    # Layout matrix instruction from layouts.json
+    layout_instruction = ""
+    layouts = load_layouts()
+    target_layout = request.layout
+    if not target_layout and request.format:
+        candidate = f"{request.format.upper()}_LAYOUT"
+        if candidate in layouts:
+            target_layout = candidate
+
+    if target_layout and target_layout in layouts:
+        layout_data = layouts[target_layout]
+        layout_instruction = f"\n\nLAYOUT GUIDANCE (Agnostic Matrix - from {target_layout}):\n```json\n{json.dumps(layout_data, indent=2)}\n```\nFollow this block matrix structure, item layout flow, and anchor slot mapping strictly."
+    elif target_layout:
+        layout_instruction = f"\n\nLayout preference: {target_layout}."
 
     user_text = request.message
     if request.system_prompt:
         user_text = f"{request.system_prompt}\n\n{user_text}"
 
-    full_prompt = f"{system_prompt}{page_instruction}\n\nUSER REQUEST:\n{user_text}"
+    full_prompt = f"{system_prompt}{page_instruction}{layout_instruction}\n\nUSER REQUEST:\n{user_text}"
 
     messages = [{"role": "user", "content": [{"type": "text", "text": full_prompt}]}]
     conversation_id = session_store.get("conversation_id")
@@ -596,7 +718,8 @@ async def send_command(request: ChatRequest):
     if request.web_search:
         payload["tools"] = [{"type": "web_search", "web_search": {"enable": True}}]
 
-    payload["max_pages"] = effective_page_count
+    if request.page_count:
+        payload["max_pages"] = request.page_count
 
     # Safe max_tokens to prevent context-length crashes (cap at 1/3 of 200k context)
     payload["max_tokens"] = 65000
@@ -889,20 +1012,6 @@ async def send_command(request: ChatRequest):
                                 slide_html = slide_html.replace("</head>", f"{css_injection}</head>")
                             else:
                                 slide_html = f"{css_injection}\n" + slide_html
-
-                    # Append print CSS from style bank if applicable
-                    if style_id and style_id != "auto":
-                        sp = styles.get(style_id)
-                        if sp and sp.get("print_css"):
-                            print_css = sp["print_css"]
-                            if "</head>" in slide_html:
-                                slide_html = slide_html.replace(
-                                    "</head>", f"<style>{print_css}</style>\n</head>"
-                                )
-                            elif "</style>" in slide_html:
-                                slide_html = slide_html.replace(
-                                    "</style>", f"\n{print_css}\n</style>"
-                                )
 
                     filepath = save_slide_to_file(slide_html, request.message)
 
