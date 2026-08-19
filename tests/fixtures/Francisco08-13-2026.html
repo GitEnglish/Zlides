@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lesson Asset Catalog — 08-07-2026 — Francisco</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #0f1112;
+            color: #e5e7eb;
+            font-family: 'Roboto', sans-serif;
+            font-size: 22px;
+            line-height: 1.6;
+        }
+
+        svg {
+            width: 32px;
+            height: 32px;
+            stroke-width: 2px;
+            color: #ff6b35;
+            margin-right: 12px;
+            vertical-align: middle;
+            fill: none;
+            stroke: currentColor;
+            flex-shrink: 0;
+        }
+
+        .container {
+            width: 100%;
+            margin: 0;
+            padding: clamp(18px, 3vw, 44px);
+            display: grid;
+            gap: 34px;
+        }
+
+        .header-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 36px;
+            line-height: 1.2;
+            color: #ffffff;
+        }
+
+        .date {
+            font-size: 18px;
+            color: #9ca3af;
+            white-space: nowrap;
+        }
+
+        .stats-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #3f3f46;
+        }
+
+        .summary-box {
+            position: relative;
+            background: #16181a;
+            border: 1px solid #3f3f46;
+            border-left: 4px solid #ff6b35;
+            padding: 34px 22px 22px;
+        }
+
+        .summary-label {
+            position: absolute;
+            top: 10px;
+            left: 18px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #ff6b35;
+        }
+
+        .summary-box p {
+            font-size: 20px;
+            line-height: 1.6;
+            color: #e5e7eb;
+        }
+
+        .section {
+            display: grid;
+            gap: 18px;
+        }
+
+        .section-head {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            border-bottom: 2px solid rgba(255, 107, 53, 0.35);
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            display: flex;
+            align-items: center;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 28px;
+            line-height: 1.2;
+            color: #ffffff;
+        }
+
+        h3.sm,
+        .subhead {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 23px;
+            line-height: 1.3;
+            color: #ffffff;
+        }
+
+        .count {
+            margin-left: auto;
+            font-size: 18px;
+            color: #9ca3af;
+            border: 1px solid #3f3f46;
+            border-radius: 999px;
+            padding: 4px 10px;
+            white-space: nowrap;
+        }
+
+        .chip {
+            display: inline-block;
+            font-size: 18px;
+            color: #e5e7eb;
+            background: #16181a;
+            border: 1px solid #3f3f46;
+            border-radius: 999px;
+            padding: 4px 12px;
+            white-space: nowrap;
+        }
+
+        .grid-1,
+        .grid-2,
+        .grid-3,
+        .row-2 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 18px;
+        }
+
+        .card {
+            background: #16181a;
+            border: 1px solid #3f3f46;
+            border-left: 4px solid #ff6b35;
+            padding: 20px;
+            display: grid;
+            gap: 12px;
+            align-content: start;
+        }
+
+        .vocab-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            font-size: 18px;
+            color: #9ca3af;
+        }
+
+        .card p,
+        .card-text-only,
+        .kv span {
+            font-size: 20px;
+            line-height: 1.6;
+            color: #e5e7eb;
+        }
+
+        .bullets {
+            list-style: none;
+            display: grid;
+            gap: 8px;
+        }
+
+        .bullets li {
+            position: relative;
+            padding-left: 22px;
+            font-size: 20px;
+            line-height: 1.6;
+            color: #e5e7eb;
+        }
+
+        .bullets li::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0.65em;
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #ff6b35;
+        }
+
+        .kv {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            align-items: start;
+        }
+
+        .kv-tag {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ff6b35;
+            border: 1px solid #3f3f46;
+            border-radius: 6px;
+            padding: 2px 8px;
+            white-space: nowrap;
+        }
+
+        .kv.trap .kv-tag {
+            color: #dc2626;
+            border-color: rgba(220, 38, 38, 0.45);
+        }
+
+        .column {
+            display: grid;
+            gap: 16px;
+            align-content: start;
+        }
+
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            border-top: 1px solid #3f3f46;
+            padding-top: 16px;
+            font-size: 18px;
+            color: #9ca3af;
+        }
+
+        @media (min-width: 640px) {
+
+            .grid-2,
+            .grid-3,
+            .row-2 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .grid-3 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 767px) {
+            .container {
+                padding: 16px;
+                gap: 26px;
+            }
+
+            h1 {
+                font-size: 30px;
+            }
+
+            h2 {
+                font-size: 24px;
+            }
+
+            h3.sm,
+            .subhead {
+                font-size: 22px;
+            }
+
+            .summary-box {
+                padding: 30px 16px 16px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+        }
+
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 12mm;
+            }
+
+            body {
+                background: #fff !important;
+                color: #111 !important;
+            }
+
+            .container {
+                max-width: 100% !important;
+                width: 100% !important;
+                padding: 0 !important;
+            }
+
+            .card,
+            .summary-box {
+                background: #fff !important;
+                border-color: #d1d5db !important;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .card p,
+            .card-text-only,
+            .card li,
+            .kv span,
+            h1,
+            h2,
+            h3.sm,
+            .subhead {
+                color: #111 !important;
+            }
+
+            .vocab-meta,
+            .chip,
+            .count,
+            .date,
+            .footer {
+                color: #4b5563 !important;
+            }
+
+            svg {
+                color: #111 !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="container">
+
+        <header class="header-row">
+            <h1>AI Dreams, Browser Wars, and the Art of Breaking Up with Kimmy</h1>
+            <div class="date">08-07-2026</div>
+        </header>
+
+        <div class="stats-row">
+            <span class="chip">Duration: 57.5 min</span>
+            <span class="chip">Total Words: 8053</span>
+            <span class="chip">WPM: 135.6</span>
+            <span class="chip">Confidence: 91.2%</span>
+        </div>
+
+        <section class="summary-box" aria-label="Summary">
+            <span class="summary-label">Summary</span>
+            <p>Masterclass in AI industry analysis, comparing browser wars to the AI battles.</p>
+        </section>
+
+        <section class="section" aria-label="Vocabulary">
+            <div class="section-head">
+                <h2>
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    Vocabulary
+                </h2>
+                <span class="count">Total items: 20</span>
+            </div>
+            <div class="grid-3">
+                <div class="card">
+                    <h3 class="sm">disillusioned</h3><span class="vocab-meta">adj · Frequency: BEYOND 60K</span>
+                    <p>Disappointed by unmet expectations.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">credibility</h3><span class="vocab-meta">n · Frequency: 5925</span>
+                    <p>Trustworthiness others can believe.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">monopolize</h3><span class="vocab-meta">v · Frequency: 15172</span>
+                    <p>Control whole market alone.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">competitors</h3><span class="vocab-meta">n · Frequency: 3733</span>
+                    <p>Companies chasing same customers.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">economization</h3><span class="vocab-meta">n · Frequency: BEYOND 60K</span>
+                    <p>Cutting costs to save.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">entrepreneur</h3><span class="vocab-meta">n · Frequency: 8692</span>
+                    <p>Person starting own business.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">dashboard</h3><span class="vocab-meta">n · Frequency: 11900</span>
+                    <p>Screen showing key data.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">indicators</h3><span class="vocab-meta">n · Frequency: 6045</span>
+                    <p>Signs showing performance clearly.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">deliveries</h3><span class="vocab-meta">n · Frequency: 3086</span>
+                    <p>Results produced for others.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">guardrails</h3><span class="vocab-meta">n · Frequency: BEYOND 60K</span>
+                    <p>Limits preventing bad outcomes.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">harness</h3><span class="vocab-meta">n · Frequency: 10084</span>
+                    <p>System controlling AI model.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">hardcoded</h3><span class="vocab-meta">adj · Frequency: BEYOND 60K</span>
+                    <p>Fixed inside system permanently.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">reproducible</h3><span class="vocab-meta">adj · Frequency: 13305</span>
+                    <p>Repeatable with same result.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">paranoia</h3><span class="vocab-meta">n · Frequency: 8530</span>
+                    <p>Intense worry about threats.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">phenomenon</h3><span class="vocab-meta">n · Frequency: 4298</span>
+                    <p>Interesting and unusual event.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">tirade</h3><span class="vocab-meta">n · Frequency: 16367</span>
+                    <p>Long angry complaint speech.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">fraud</h3><span class="vocab-meta">n · Frequency: 4841</span>
+                    <p>Dishonest trick or lie.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">rationale</h3><span class="vocab-meta">n · Frequency: 8692</span>
+                    <p>Reasons behind a decision.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">castrated</h3><span class="vocab-meta">v · Frequency: 36940</span>
+                    <p>Power removed, weakened metaphorically.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">default</h3><span class="vocab-meta">v · Frequency: 2000</span>
+                    <p>Return to standard option.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" aria-label="Phrasal Verbs">
+            <div class="section-head">
+                <h2>
+                    <svg viewBox="0 0 24 24">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                    Phrasal Verbs
+                </h2>
+                <span class="count">Total items: 8</span>
+            </div>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="sm">break up</h3><span class="vocab-meta">Latinate: separate · Usage: 85% / 15%</span>
+                    <p>Casual/Standard. Natural choice for ending relationships or subscriptions. Not for broken machines.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">pull the rug out from under</h3><span class="vocab-meta">Latinate: withdraw support · Usage: 70% / 30%</span>
+                    <p>Casual/Standard. Support removed without warning. Causes sudden unexpected failure.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">set up</h3><span class="vocab-meta">Latinate: configure · Usage: 80% / 20%</span>
+                    <p>Casual/Standard. Prepares systems for use. Natural in tech talk.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">suck up</h3><span class="vocab-meta">Latinate: consume · Usage: 75% / 25%</span>
+                    <p>Casual. Absorbs context very greedily. Avoid in formal reports.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">scratch the surface</h3><span class="vocab-meta">Latinate: begin to understand · Usage: 80% / 20%</span>
+                    <p>Standard. Only beginning to understand. Much remains hidden underneath.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">squeeze out</h3><span class="vocab-meta">Latinate: extract · Usage: 65% / 35%</span>
+                    <p>Casual. Extracts value with effort. Gets the last drops.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">burn through</h3><span class="vocab-meta">Latinate: expend rapidly · Usage: 70% / 30%</span>
+                    <p>Casual/Standard. Consumes tokens very fast. Common in tech talk.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">plug in</h3><span class="vocab-meta">Latinate: connect · Usage: 75% / 25%</span>
+                    <p>Casual/Standard. Components connected and operational. Physical connection image.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" aria-label="Collocations">
+            <div class="section-head">
+                <h2>
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                        <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                        <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                        <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                    </svg>
+                    Collocations
+                </h2>
+                <span class="count">Total items: 8</span>
+            </div>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="sm">comfort food</h3>
+                    <p>Familiar and comforting content. Emotional ease over challenge.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">market share</h3>
+                    <p>Percentage of controlled sales. Standard business analysis term.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">game changer</h3>
+                    <p>Completely changes the situation. Often sarcastic about hype.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">side work</h3>
+                    <p>Work beside main job. Prefer saying side job.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">first shot</h3>
+                    <p>Success on first attempt. Natural spoken casual praise.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">big failure</h3>
+                    <p>Significant unsuccessful final result. Strong, clear negative judgment.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">close eyes</h3>
+                    <p>Unnatural literal Spanish translation. Use believe blindly instead.</p>
+                </div>
+                <div class="card">
+                    <h3 class="sm">fillable</h3>
+                    <p>Editable PDF form file. Tech and design vocabulary.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" aria-label="Grammar">
+            <div class="section-head">
+                <h2>
+                    <svg viewBox="0 0 24 24">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                    Grammar
+                </h2>
+                <span class="count">Total items: 2</span>
+            </div>
+            <div class="grid-1">
+                <div class="card">
+                    <h3 class="sm">Comparative structure with 'quarter of'</h3>
+                    <p>The correct form is 'a quarter of the cost' or 'a quarter of what the Americans spend.' The comparative word 'than' goes with 'less' or 'more,' not with 'of.'</p>
+                    <div class="kv model"><span class="kv-tag">ALT</span><span>'a quarter of the cost' or 'a quarter of what the Americans spend'</span></div>
+                    <div class="kv"><span class="kv-tag">EX</span><span>They can do it for a quarter of the cost.</span></div>
+                    <div class="kv"><span class="kv-tag">EX</span><span>They spend a quarter of what we spend.</span></div>
+                    <div class="kv trap"><span class="kv-tag">TRAP</span><span>Don't combine 'of' with 'than.' 'Quarter of money than' mixes two patterns.</span></div>
+                </div>
+                <div class="card">
+                    <h3 class="sm">Adjective vs noun form: entrepreneur</h3>
+                    <p>'Entrepreneur' is a noun (a person). The adjective form is 'entrepreneurial'. Using the noun as an adjective sounds non-native in formal contexts.</p>
+                    <div class="kv model"><span class="kv-tag">ALT</span><span>'entrepreneurial things' or 'business ventures'</span></div>
+                    <div class="kv"><span class="kv-tag">EX</span><span>She has an entrepreneurial spirit.</span></div>
+                    <div class="kv"><span class="kv-tag">EX</span><span>He's an entrepreneur.</span></div>
+                    <div class="kv trap"><span class="kv-tag">TRAP</span><span>English creates adjectives from nouns by adding -ial, -al, or -ic.</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" aria-label="Idioms and Phrases">
+            <div class="section-head">
+                <h2>
+                    <svg viewBox="0 0 24 24">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    Idioms and Phrases
+                </h2>
+                <span class="count">Total items: 6</span>
+            </div>
+            <div class="grid-2">
+                <div class="card">
+                    <h3 class="sm">pull the rug out from under</h3><span class="vocab-meta">Register: Casual/Standard</span>
+                    <p>Support is suddenly removed. Failure follows very quickly.</p>
+                    <div class="kv model"><span class="kv-tag">MEANING</span><span>Betray by removing support.</span></div>
+                </div>
+                <div class="card">
+                    <h3 class="sm">scratch the surface</h3><span class="vocab-meta">Register: Standard</span>
+                    <p>Only partial understanding so far. Much remains hidden underneath.</p>
+                    <div class="kv model"><span class="kv-tag">MEANING</span><span>Barely begin understanding.</span></div>
+                </div>
+                <div class="card">
+                    <h3 class="sm">comfort food</h3><span class="vocab-meta">Register: Casual</span>
+                    <p>Familiar and easy content. Comfort chosen over challenge.</p>
+                    <div class="kv model"><span class="kv-tag">MEANING</span><span>Emotional comfort material.</span></div>
+                </div>
+                <div class="card">
+                    <h3 class="sm">game changer</h3><span class="vocab-meta">Register: Casual/Standard</span>
+                    <p>Changes the rules completely. Often hype or sarcasm.</p>
+                    <div class="kv model"><span class="kv-tag">MEANING</span><span>Rule-changing development.</span></div>
+                </div>
+                <div class="card">
+                    <h3 class="sm">catch-22</h3><span class="vocab-meta">Register: Standard</span>
+                    <p>Contradictory rules block success. No good solution exists.</p>
+                    <div class="kv model"><span class="kv-tag">MEANING</span><span>Unsolvable trapped situation.</span></div>
+                </div>
+                <div class="card">
+                    <h3 class="sm">the writing on the wall</h3><span class="vocab-meta">Register: Standard</span>
+                    <p>Warning signs clearly visible. Decline or failure ahead.</p>
+                    <div class="kv model"><span class="kv-tag">MEANING</span><span>Obvious coming failure.</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" aria-label="Focus Points">
+            <div class="section-head">
+                <h2>
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <circle cx="12" cy="12" r="6"></circle>
+                        <circle cx="12" cy="12" r="2"></circle>
+                    </svg>
+                    Focus Points
+                </h2>
+                <span class="count">Total items: 2</span>
+            </div>
+            <div class="grid-1">
+                <div class="card">
+                    <h3 class="sm">Self-correction as a learning signal</h3>
+                    <ul class="bullets">
+                        <li>You reached for a phrasal verb, got close, and the correction stuck.</li>
+                        <li>The 'sorry' is social smoothing, not linguistic apology.</li>
+                        <li>Particle selection is still imprecise, which is normal at B2.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3 class="sm">Register flexibility</h3>
+                    <ul class="bullets">
+                        <li>Switches registers very naturally within the same conversation.</li>
+                        <li>Business topics trigger professional precision automatically.</li>
+                        <li>Personal tone remains casual and natural.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" aria-label="Practice and Self-Study">
+            <div class="section-head">
+                <h2>
+                    <svg viewBox="0 0 24 24">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Practice &amp; Self-Study
+                </h2>
+                <span class="count">Total items: 4</span>
+            </div>
+            <div class="row-2">
+                <div class="column">
+                    <h3 class="subhead">In-Class Practice</h3>
+                    <div class="card">
+                        <p class="card-text-only">The 'quarter of' comparative drill with real cost comparisons from tech news.</p>
+                    </div>
+                    <div class="card">
+                        <p class="card-text-only">Phrasal verb particle sorting using real business situations, not lists.</p>
+                    </div>
+                </div>
+                <div class="column">
+                    <h3 class="subhead">Self-Study</h3>
+                    <div class="card">
+                        <p class="card-text-only">Read one tech news article and highlight 5 phrasal verbs with their situations.</p>
+                    </div>
+                    <div class="card">
+                        <p class="card-text-only">Audit business comparisons to ensure 'of' and 'than' are not mixed.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" aria-label="Action Items">
+            <div class="section-head">
+                <h2>
+                    <svg viewBox="0 0 24 24">
+                        <polyline points="9 11 12 14 22 4"></polyline>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    Action Items
+                </h2>
+                <span class="count">Total items: 7</span>
+            </div>
+            <div class="row-2">
+                <div class="column">
+                    <h3 class="subhead">Francisco's Action Items</h3>
+                    <div class="card">
+                        <p class="card-text-only">Read the tech news article and highlight phrasal verbs.</p>
+                    </div>
+                    <div class="card">
+                        <p class="card-text-only">Practice the 'quarter of' comparative structure with real cost data.</p>
+                    </div>
+                    <div class="card">
+                        <p class="card-text-only">Continue reading PDFs Aaron sends.</p>
+                    </div>
+                </div>
+                <div class="column">
+                    <h3 class="subhead">Aaron's Action Items</h3>
+                    <div class="card">
+                        <p class="card-text-only">Send fillable PDF to Francisco.</p>
+                    </div>
+                    <div class="card">
+                        <p class="card-text-only">Build more phrasal verb particle exercises using real business scenarios.</p>
+                    </div>
+                    <div class="card">
+                        <p class="card-text-only">Prepare dashboard-related discussion for next session.</p>
+                    </div>
+                    <div class="card">
+                        <p class="card-text-only">Send a tech news article with embedded phrasal verbs.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <span>Aaron &amp; AiRON · W32-C56-08-07-2026 · Francisco</span>
+            <span>LCP: Francisco-LCP-08-07-2026.json · IEL: Francisco-IEL-08-07-2026.json</span>
+        </footer>
+
+    </main>
+</body>
+
+</html>
