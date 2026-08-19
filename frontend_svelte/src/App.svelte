@@ -109,6 +109,7 @@
   let liveHtmlChunks: string[] = [];
   let iframeElement: HTMLIFrameElement | null = null;
   let thinkingBuffer = '';
+  let isEditingHtml = false;
 
   // We'll define these fully in Step 3, but provide stubs to make TS happy
   let chatMessages: any[] = [{ role: "agent", text: "Ready! Pick a format + style, describe what you want." }];
@@ -495,11 +496,20 @@
       <div class="flex gap-2">
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={async () => {
           if (!slides.length) return;
-          const html = slides[currentSlideIndex].html;
+          let html = slides[currentSlideIndex].html;
+
+          // Inject print-color-adjust to guarantee exact colors during PDF export
+          const styleInjection = "<style>* { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }</style>";
+          if (html.includes("</head>")) {
+              html = html.replace("</head>", styleInjection + "</head>");
+          } else {
+              html = styleInjection + html;
+          }
+
           try {
             status = "Generating PDF...";
             const { default: pdf } = await import('taepdf');
-            await pdf.download(html, 'A4', `slide_${currentSlideIndex + 1}.pdf`, undefined, { orientation: 'landscape' });
+            await pdf.download(html, 'A4', `slide_${currentSlideIndex + 1}.pdf`, 'fillable', { orientation: 'landscape' });
             status = "Ready";
           } catch (e: any) {
             console.error("PDF generation failed:", e);
@@ -516,18 +526,38 @@
           link.click();
           URL.revokeObjectURL(link.href);
         }}>Export HTML</button>
+        <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" class:bg-ge-accent={isEditingHtml} class:text-white={isEditingHtml} on:click={() => {
+          if (!slides.length) {
+            // Allow creating a blank slide to paste into if none exist
+            slides = [{ id: "paste_" + Date.now(), html: "<!-- Paste your HTML here -->", saved_to: "" }];
+            currentSlideIndex = 0;
+            iframeSrcDoc = slides[0].html;
+          }
+          isEditingHtml = !isEditingHtml;
+          if (!isEditingHtml) {
+              iframeSrcDoc = slides[currentSlideIndex].html;
+          }
+        }}>Edit / Paste HTML</button>
       </div>
     </div>
 
     <div class="flex-grow p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
       <div class="w-full h-full max-w-5xl bg-white rounded shadow-2xl border border-ge-border overflow-hidden relative neumorphic" style="aspect-ratio: 16/9;">
-        <iframe
-          bind:this={iframeElement}
-          title="Slide Preview"
-          srcdoc={iframeSrcDoc}
-          class="w-full h-full bg-white"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-        ></iframe>
+        {#if isEditingHtml}
+          <textarea
+            bind:value={slides[currentSlideIndex].html}
+            class="w-full h-full bg-[#1e1e1e] text-[#d4d4d4] font-mono p-4 resize-none outline-none"
+            placeholder="Paste your HTML here..."
+          ></textarea>
+        {:else}
+          <iframe
+            bind:this={iframeElement}
+            title="Slide Preview"
+            srcdoc={iframeSrcDoc}
+            class="w-full h-full bg-white"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          ></iframe>
+        {/if}
       </div>
     </div>
 

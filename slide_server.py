@@ -150,6 +150,8 @@ def build_system_prompt(fmt: str, style_id: str, language: str = "en") -> str:
                 for k, v in css.items():
                     base += f"- {k}: {v}\n"
 
+    base += "\n\nNEVER inject your own @media print background overrides."
+
     return base
 
 
