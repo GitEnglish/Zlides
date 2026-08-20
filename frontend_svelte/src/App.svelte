@@ -597,58 +597,124 @@
       </div>
       <div class="flex gap-2">
         <button
-          disabled={isExportingPdf || !slides.length}
+          disabled={isExportingPdf || (!slides.length && !editorHtml && !iframeSrcDoc)}
           class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors disabled:opacity-50"
           on:click={async () => {
-            if (!slides.length || isExportingPdf) return;
+            const html = isEditingHtml && editorHtml ? editorHtml : (slides.length ? slides[currentSlideIndex].html : editorHtml || iframeSrcDoc);
+            if (!html || isExportingPdf) return;
             isExportingPdf = true;
             status = "Generating PDF...";
             try {
-              const html = slides[currentSlideIndex].html;
               const { default: pdf } = await import('taepdf');
               await pdf.warmup();
 
               // 1. Strip any legacy @media print blocks that force white backgrounds
               let exportHtml = html.replace(/@media\s+print\s*\{[\s\S]*?\}\s*\}/gi, '');
 
-              // 2. Resolve SVGs so stroke/fill attributes are explicit for isolated rendering
+              // 2. Resolve SVGs so stroke/fill/dimensions are explicit for isolated rendering
               exportHtml = exportHtml.replace(/<svg\b([^>]*)>/gi, (match, attrs) => {
                 let updated = attrs;
-                if (!updated.includes('stroke=')) updated += ' stroke="#ff6b35"';
+                if (!updated.includes('stroke=')) updated += ' stroke="currentColor"';
                 if (!updated.includes('fill=')) updated += ' fill="none"';
                 if (!updated.includes('stroke-width=')) updated += ' stroke-width="2"';
+                if (!updated.includes('width=')) updated += ' width="32"';
+                if (!updated.includes('height=')) updated += ' height="32"';
                 return `<svg${updated}>`;
               });
 
-              // 3. Inject font-face rules, block-level container flow, and card break protection
+              // 3. Detect orientation (worksheets, reports, guides, posters, and LAC catalogs are portrait)
+              const isPortrait = selectedFormat === 'worksheet' || selectedFormat === 'report' || selectedFormat === 'guide' || selectedFormat === 'poster' || selectedFormat === 'lac' || exportHtml.includes('Lesson Asset Catalog') || exportHtml.includes('Vocabulary') || exportHtml.includes('Action Items');
+              const orientation = isPortrait ? 'portrait' : 'landscape';
+              const pageWidthPt = isPortrait ? '595.28pt' : '841.89pt';
+
+              // 4. Chunk multi-card grid containers into individual break-protected grid rows
+              try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(exportHtml, 'text/html');
+                const gridContainers = doc.querySelectorAll('.grid-2, .grid-3, .grid-4, .row-2');
+                gridContainers.forEach(container => {
+                  const is3Col = container.classList.contains('grid-3');
+                  const is4Col = container.classList.contains('grid-4');
+                  const cols = is4Col ? 4 : (is3Col ? 3 : 2);
+                  const children = Array.from(container.children);
+                  if (children.length <= cols) return;
+                  
+                  const parent = container.parentNode;
+                  if (!parent) return;
+                  
+                  for (let i = 0; i < children.length; i += cols) {
+                    const row = doc.createElement('div');
+                    row.className = `grid-row-${cols}`;
+                    row.style.cssText = `display: grid; grid-template-columns: repeat(${cols}, 1fr); gap: 14px; margin-bottom: 14px; break-inside: avoid !important; page-break-inside: avoid !important;`;
+                    const chunk = children.slice(i, i + cols);
+                    chunk.forEach(child => row.appendChild(child));
+                    parent.insertBefore(row, container);
+                  }
+                  parent.removeChild(container);
+                });
+                exportHtml = doc.documentElement.outerHTML;
+              } catch (e) {
+                console.warn("DOMParser grid chunking failed, falling back:", e);
+              }
+
+              // 5. Inject font-face rules, exact A4 print dimensions, and card break protection
               const baseEnhancementsCss = `
                 @font-face{font-family:'Inter';src:url('/fonts/inter.woff2') format('woff2');font-weight:100 900;font-style:normal;}
                 @font-face{font-family:'Roboto';src:url('/fonts/roboto.woff2') format('woff2');font-weight:100 900;font-style:normal;}
                 @font-face{font-family:'Outfit';src:url('/fonts/outfit.woff2') format('woff2');font-weight:100 900;font-style:normal;}
                 @font-face{font-family:'Raleway';src:url('/fonts/raleway.woff2') format('woff2');font-weight:100 900;font-style:normal;}
                 
-                .container, main, .page {
-                  display: block !important;
+                html, body {
+                  width: ${pageWidthPt} !important;
+                  margin: 0 auto !important;
+                  padding: 0 !important;
                   background: #0f1112 !important;
-                  color: #e5e7eb !important;
-                  min-height: 100% !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
                 }
-                .card, .summary-box, .section, .section-head, .header-row, .stats-row, .exercise, tr {
+                
+                .container, main, .page, section, .section {
+                  display: block !important;
+                }
+
+                .container, main, .page {
+                  width: 100% !important;
+                  min-height: 100% !important;
+                  box-sizing: border-box !important;
+                  padding: 28pt 36pt !important;
+                  background: inherit !important;
+                  color: #e5e7eb !important;
+                }
+
+                section, .section {
+                  margin-bottom: 24pt !important;
+                }
+
+                .grid-2, .grid-3, .grid-4, .row-2, [class^="grid-row-"] {
+                  display: grid !important;
                   break-inside: avoid !important;
                   page-break-inside: avoid !important;
                 }
+
+                .card, .summary-box, .section-head, .header-row, .stats-row, .exercise, tr {
+                  break-inside: avoid !important;
+                  page-break-inside: avoid !important;
+                  box-sizing: border-box !important;
+                }
+
+                input, textarea, select {
+                  font-family: 'Roboto', 'Inter', sans-serif !important;
+                  box-sizing: border-box !important;
+                }
               `;
 
-              if (exportHtml.includes('<style>')) {
-                exportHtml = exportHtml.replace('<style>', `<style>\n${baseEnhancementsCss}\n`);
-              } else if (exportHtml.includes('</head>')) {
+              if (exportHtml.includes('</head>')) {
                 exportHtml = exportHtml.replace('</head>', `<style>\n${baseEnhancementsCss}\n</style>\n</head>`);
+              } else if (exportHtml.includes('<style>')) {
+                exportHtml = exportHtml.replace('</style>', `\n${baseEnhancementsCss}\n</style>`);
               } else {
                 exportHtml = `<style>\n${baseEnhancementsCss}\n</style>\n` + exportHtml;
               }
-
-              const isPortrait = selectedFormat === 'worksheet' || selectedFormat === 'report' || selectedFormat === 'guide' || selectedFormat === 'poster';
-              const orientation = isPortrait ? 'portrait' : 'landscape';
 
               await pdf.download(exportHtml, 'A4', `slide_${currentSlideIndex + 1}.pdf`, 'fillable', { orientation });
               status = "Ready";
@@ -662,27 +728,17 @@
 
         <button class="text-xs px-3 py-1 bg-ge-bg border border-ge-border rounded hover:bg-ge-border transition-colors" on:click={() => {
           if (!slides.length) {
-            slides = [{ html: '<html><body><div class="p-8"><h1>Paste your HTML here</h1></div></body></html>' }];
+            slides = [{ html: editorHtml || '<html><body><div class="p-8"><h1>Paste your HTML here</h1></div></body></html>' }];
             currentSlideIndex = 0;
           }
           isEditingHtml = !isEditingHtml;
           if (isEditingHtml) {
-            editorHtml = slides[currentSlideIndex].html;
+            editorHtml = slides[currentSlideIndex]?.html || editorHtml;
           } else {
-            slides[currentSlideIndex].html = editorHtml;
-            const combined = [editorHtml].join('')
-                .replace(/\\n/g, '\n').replace(/\\"/g, '"');
-            try {
-                const doc = iframeElement?.contentDocument;
-                if (doc && doc.body && doc.body.innerHTML.length > 0) {
-                    const prevScroll = doc.documentElement.scrollTop || doc.body.scrollTop;
-                    doc.body.innerHTML = combined;
-                    doc.documentElement.scrollTop = doc.body.scrollTop = prevScroll;
-                } else {
-                    iframeSrcDoc = combined;
-                }
-            } catch(e) {
-                iframeSrcDoc = combined;
+            if (editorHtml) {
+              slides[currentSlideIndex] = { html: editorHtml };
+              slides = [...slides];
+              iframeSrcDoc = editorHtml;
             }
           }
         }}>{isEditingHtml ? 'Apply HTML' : 'Edit / Paste HTML'}</button>
